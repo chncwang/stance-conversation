@@ -1027,6 +1027,7 @@ int main(int argc, const char *argv[]) {
             using namespace std::chrono;
             int duration_count = 1e3;
 
+            int corpus_word_sum = 0;
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
@@ -1062,6 +1063,15 @@ int main(int argc, const char *argv[]) {
 
                 graph.compute();
 
+                int word_sum = 0;
+                for (int i = 0; i < batch_size; ++i) {
+                    int instance_index = getSentenceIndex(i);
+                    int response_id = train_conversation_pairs.at(instance_index).response_id;
+                    int size = response_sentences.at(response_id).size();
+                    word_sum += size;
+                }
+                corpus_word_sum += word_sum;
+
                 for (int i = 0; i < batch_size; ++i) {
                     int instance_index = getSentenceIndex(i);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
@@ -1070,7 +1080,7 @@ int main(int argc, const char *argv[]) {
                     vector<Node*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
                     auto result = maxLogProbabilityLoss(result_nodes, word_ids,
-                            1.0 / batch_size / word_ids.size());
+                            1.0 / word_sum);
                     loss_sum += result.first;
 
                     analyze(result.second, word_ids, *metric);
@@ -1091,7 +1101,7 @@ int main(int argc, const char *argv[]) {
                         }
                     }
                 }
-                cout << "loss:" << loss_sum << endl;
+                cout << "loss:" << loss_sum << " ppl:" << exp(loss_sum / (batch_i + 1)) << endl;
                 metric->print();
 
                 graph.backward();
