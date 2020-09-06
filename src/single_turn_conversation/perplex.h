@@ -30,6 +30,9 @@ float computePerplex(const std::vector<Node *> &nodes, const std::vector<int> &a
             cerr << boost::format("answer:%1% dim:%2%") << answer << node.getDim() << endl;
             abort();
         }
+#if USE_GPU
+        node.val().copyFromDeviceToHost();
+#endif
         float reciprocal_answer_prob = 1 / node.getVal()[answer];
         log_sum += log(reciprocal_answer_prob);
 

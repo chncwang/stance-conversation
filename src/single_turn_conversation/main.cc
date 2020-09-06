@@ -355,8 +355,9 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
     float perplex(0.0f), corpus_hit_sum(0);
     vector<int> corpus_pos_hit_amount, corpus_pos_amount;
     int size_sum = 0;
-    thread_pool pool(16);
+    thread_pool pool(1);
     mutex perplex_mutex;
+    globalPoolEnabled() = false;
 
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
         auto f = [&]() {
@@ -370,8 +371,6 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             vector<int> post_hit_counts, post_pos_amounts;
             cout << "response size:" << response_ids.size() << endl;
             for (int response_id : response_ids) {
-                //            cout << "response:" << endl;
-                //            print(response_sentences.at(response_id));
                 Graph graph;
                 GraphBuilder graph_builder;
                 graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
@@ -440,6 +439,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             corpus_pos_hit_amount.at(i) % corpus_pos_amount.at(i) %
             (static_cast<float>(corpus_pos_hit_amount.at(i)) / corpus_pos_amount.at(i)) << endl;
     }
+    globalPoolEnabled() = true;
     return perplex;
 }
 
@@ -1147,6 +1147,10 @@ int main(int argc, const char *argv[]) {
 
                 ++iteration;
             }
+
+            float perplex = metricTestPosts(hyper_params, model_params,
+                    dev_post_and_responses, post_sentences, response_sentences);
+            cout << "dev ppl:" << perplex << endl;
 
             cout << "loss_sum:" << loss_sum << " last_loss_sum:" << endl;
             if (loss_sum > last_loss_sum) {
