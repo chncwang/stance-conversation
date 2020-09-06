@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+*.swp
+build/
+compile_commands.json

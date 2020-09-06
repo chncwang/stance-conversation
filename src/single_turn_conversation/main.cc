@@ -620,15 +620,11 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         candidate_and_references_vector.push_back(candidate_and_references);
 
         for (int ngram = 1; ngram <=4; ++ngram) {
-            float bleu_value = computeMtevalBleu(candidate_and_references_vector, ngram);
+            float bleu_value = computeBleu(candidate_and_references_vector, ngram);
             cout << "bleu_" << ngram << ":" << bleu_value << endl;
             float bleu_mean, bleu_deviation;
-            computeMtevalBleuForEachResponse(candidate_and_references_vector, ngram, bleu_mean,
-                    bleu_deviation);
             cout << boost::format("bleu_%1% mean:%2% deviation:%3%") % ngram % bleu_mean %
                 bleu_deviation << endl;
-            float nist_value = computeNist(candidate_and_references_vector, ngram);
-            cout << "nist_" << ngram << ":" << nist_value << endl;
             float dist_value = computeDist(candidate_and_references_vector, ngram);
             cout << "dist_" << ngram << ":" << dist_value << endl;
             float cider = computeCIDEr(candidate_and_references, ngram_idf_tables.at(ngram - 1),
@@ -744,7 +740,7 @@ unordered_map<string, float> calculateIdf(const vector<vector<string>> sentences
     return result;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, const char *argv[]) {
     cout << "dtype size:" << sizeof(dtype) << endl;
 
     Options options("single-turn-conversation", "single turn conversation");

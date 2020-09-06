@@ -17,8 +17,6 @@
 #include "conversation_structure.h"
 #include "print.h"
 #include "tinyutf8.h"
-#include "mteval/NISTEvaluator.h"
-#include "mteval/BLEUEvaluator.h"
 #include "N3LDG.h"
 
 using namespace std;
@@ -217,89 +215,6 @@ float computeBleu(const vector<CandidateAndReferences> &candidate_and_references
     float bp = c_sum > r_sum ? 1.0f : exp(1 - static_cast<float>(r_sum) / c_sum);
     cout << boost::format("candidate sum:%1% ref:%2% bp:%3%") % c_sum % r_sum % bp << endl;
     return bp * exp(weighted_sum);
-}
-
-float computeMtevalBleu(const vector<CandidateAndReferences> &candidate_and_references_vector,
-        int max_gram_len) {
-    using namespace MTEval;
-    EvaluatorParam param;
-    param.name = "ngram";
-    param.int_val = max_gram_len;
-    BLEUEvaluator evaluator({param});
-    vector<Sample> samples;
-    for (const CandidateAndReferences &e : candidate_and_references_vector) {
-        Sample sample;
-        sample.hypothesis = e.candidate;
-        sample.references = e.references;
-        evaluator.prepare(sample);
-        samples.push_back(move(sample));
-    }
-
-    Statistics stats;
-    for (const Sample sample : samples) {
-        stats += evaluator.map(sample);
-    }
-
-    float score = evaluator.integrate(stats);
-
-    return score;
-}
-
-float computeMtevalBleu(const CandidateAndReferences &candidate_and_references,
-        int max_gram_len) {
-    vector<CandidateAndReferences> v = {candidate_and_references};
-    return computeMtevalBleu(v, max_gram_len);
-}
-
-void computeMtevalBleuForEachResponse(
-        const vector<CandidateAndReferences> &candidate_and_references_vector,
-        int max_gram_len,
-        float &avg,
-        float &standard_deviation) {
-    using namespace boost::accumulators;
-
-    vector<float> bleus;
-    for (const auto &e : candidate_and_references_vector) {
-        float bleu = computeMtevalBleu(e, max_gram_len);
-        bleus.push_back(bleu);
-    }
-
-    avg = accumulate(bleus.begin(), bleus.end(), 0.0f) / bleus.size();
-    vector<float> zero_centralized_squares;
-    for (float bleu : bleus) {
-        float v = bleu - avg;
-        zero_centralized_squares.push_back(v * v);
-    }
-    float variance = zero_centralized_squares.size() == 1 ? 0 :
-        accumulate(zero_centralized_squares.begin(), zero_centralized_squares.end(), 0.0f) /
-        (zero_centralized_squares.size() - 1);
-    standard_deviation = sqrt(variance);
-}
-
-float computeNist(const vector<CandidateAndReferences> &candidate_and_references_vector,
-        int max_gram_len) {
-    using namespace MTEval;
-    EvaluatorParam param;
-    param.name = "ngram";
-    param.int_val = max_gram_len;
-    NISTEvaluator evaluator({param});
-    vector<Sample> samples;
-    for (const CandidateAndReferences &e : candidate_and_references_vector) {
-        Sample sample;
-        sample.hypothesis = e.candidate;
-        sample.references = e.references;
-        evaluator.prepare(sample);
-        samples.push_back(move(sample));
-    }
-
-    Statistics stats;
-    for (const Sample sample : samples) {
-        stats += evaluator.map(sample);
-    }
-
-    float score = evaluator.integrate(stats);
-
-    return score;
 }
 
 float computeEntropy(const vector<CandidateAndReferences> &candidate_and_references_vector,
