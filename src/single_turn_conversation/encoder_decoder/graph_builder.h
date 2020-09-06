@@ -334,7 +334,9 @@ struct GraphBuilder {
         }
 
         for (Node* node : encoder_lookups) {
-            left_to_right_encoder.forward(graph, model_params.left_to_right_encoder_params, *node,
+            Node *bucket = n3ldg_plus::bucket(graph, hyper_params.hidden_dim, 0);
+            node = n3ldg_plus::concat(graph, {bucket, node});
+            left_to_right_encoder.forward(graph, model_params.lstm_params, *node,
                     *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
         }
     }

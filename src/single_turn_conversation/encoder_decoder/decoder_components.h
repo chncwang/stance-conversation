@@ -30,7 +30,7 @@ struct DecoderComponents {
         vector<Node *> ins = {&input, attention_builder->_hidden};
         Node *concat = n3ldg_plus::concat(graph, ins);
 
-        decoder.forward(graph, model_params.left_to_right_decoder_params, *concat, *hidden_bucket,
+        decoder.forward(graph, model_params.lstm_params, *concat, *hidden_bucket,
                 *hidden_bucket, hyper_params.dropout, is_training);
     }
 
