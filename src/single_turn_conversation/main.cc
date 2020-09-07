@@ -336,10 +336,10 @@ void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
         ModelParams &model_params,
         const Json::Value *root,
         const function<void(const DefaultConfig &default_config, const HyperParams &hyper_params,
-            ModelParams &model_params, const Alphabet*, const Alphabet*)> &allocate_model_params) {
+            ModelParams &model_params, const Alphabet*)> &allocate_model_params) {
     hyper_params.fromJson((*root)["hyper_params"]);
     hyper_params.print();
-    allocate_model_params(default_config, hyper_params, model_params, nullptr, nullptr);
+    allocate_model_params(default_config, hyper_params, model_params, nullptr);
     model_params.fromJson((*root)["model_params"]);
 #if USE_GPU
     model_params.copyFromHostToDevice();
@@ -379,7 +379,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
             vector<int> word_ids = transferVector<int, string>(
                     response_sentences.at(response_id), [&](const string &w) -> int {
-                    return model_params.decoder_lookup_table.getElemId(w);
+                    return model_params.lookup_table.getElemId(w);
                     });
             int hit_count;
             vector<int> hit_flags;
@@ -487,7 +487,7 @@ void decodedPPL(const HyperParams &hyper_params, ModelParams &model_params,
         vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
         vector<int> word_ids = transferVector<int, string>(
                 decoded_sentence, [&](const string &w) -> int {
-                return model_params.decoder_lookup_table.getElemId(w);
+                return model_params.lookup_table.getElemId(w);
                 });
         int hit_count;
         vector<int> hit_flags;
@@ -506,7 +506,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         const unordered_map<string, float> &all_idf,
         const vector<string> &black_list) {
     LookupTable<Param> original_embeddings;
-    original_embeddings.init(model_params.decoder_lookup_table.elems, hyper_params.word_file);
+    original_embeddings.init(model_params.lookup_table.elems, hyper_params.word_file);
 
     vector<vector<vector<string>>> ref_sentences;
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
@@ -553,9 +553,9 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         cout << "post:" << endl;
         print(post_sentences.at(post_and_responses.post_id));
         cout << "response:" << endl;
-        printWordIds(word_ids_and_probability, model_params.decoder_lookup_table);
+        printWordIds(word_ids_and_probability, model_params.lookup_table);
         cout << "response words:" << endl;
-        printWordIds(word_ids_and_probability, model_params.decoder_lookup_table, true);
+        printWordIds(word_ids_and_probability, model_params.lookup_table, true);
         const auto &flops = graph.getFLOPs();
         if (loop_i == 1) {
             overall_flops = flops;
@@ -589,7 +589,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
 
         vector<string> decoded_word_ids;
         auto to_str = [&](const WordIdAndProbability &in) ->string {
-            return model_params.decoder_lookup_table.elems.from_id(in.word_id);
+            return model_params.lookup_table.elems.from_id(in.word_id);
         };
         transform(word_ids_and_probability.begin(), word_ids_and_probability.end(),
                 back_inserter(decoded_word_ids), to_str);
@@ -800,53 +800,48 @@ int main(int argc, const char *argv[]) {
 
     auto all_idf = calculateIdf(all_sentences);
 
-    Alphabet post_alphabet;
-    Alphabet response_alphabet;
+    Alphabet alphabet;
     shared_ptr<Json::Value> root_ptr;
-    unordered_map<string, int> post_word_counts;
-    unordered_map<string, int> response_word_counts;
+    unordered_map<string, int> word_counts;
     if (default_config.program_mode == ProgramMode::TRAINING) {
         auto wordStat = [&]() {
             for (const ConversationPair &conversation_pair : train_conversation_pairs) {
                 const vector<string> &post_sentence = post_sentences.at(conversation_pair.post_id);
-                addWord(post_word_counts, post_sentence);
+                addWord(word_counts, post_sentence);
 
                 const vector<string> &response_sentence = response_sentences.at(
                         conversation_pair.response_id);
-                addWord(response_word_counts, response_sentence);
+                addWord(word_counts, response_sentence);
             }
 
             if (hyper_params.word_file != "" && !hyper_params.word_finetune) {
                 for (const PostAndResponses &dev : dev_post_and_responses){
                     const vector<string>&post_sentence = post_sentences.at(dev.post_id);
-                    addWord(post_word_counts, post_sentence);
+                    addWord(word_counts, post_sentence);
 
                     for(int i=0; i<dev.response_ids.size(); i++){
                         const vector<string>&resp_sentence = response_sentences.at(
                                 dev.response_ids.at(i));
-                        addWord(response_word_counts, resp_sentence);
+                        addWord(word_counts, resp_sentence);
                     }
                 }
 
                 for (const PostAndResponses &test : test_post_and_responses){
                     const vector<string>&post_sentence = post_sentences.at(test.post_id);
-                    addWord(post_word_counts, post_sentence);
+                    addWord(word_counts, post_sentence);
 
                     for(int i =0; i<test.response_ids.size(); i++){
                         const vector<string>&resp_sentence =
                             response_sentences.at(test.response_ids.at(i));
-                        addWord(response_word_counts, resp_sentence);
+                        addWord(word_counts, resp_sentence);
                     }
                 }
             }
         };
         wordStat();
-        post_word_counts[unknownkey] = 1000000000;
-        response_word_counts[unknownkey] = 1000000000;
-        post_alphabet.init(post_word_counts, hyper_params.word_cutoff);
-        cout << boost::format("post alphabet size:%1%") % post_alphabet.size() << endl;
-        response_alphabet.init(response_word_counts, hyper_params.word_cutoff);
-        cout << boost::format("response alphabet size:%1%") % response_alphabet.size() << endl;
+        word_counts[unknownkey] = 1000000000;
+        alphabet.init(word_counts, hyper_params.word_cutoff);
+        cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
     } else if (default_config.split_unknown_words) {
         root_ptr = loadModel(default_config.input_model_file);
         Json::Value &root = *root_ptr;
@@ -868,22 +863,16 @@ int main(int argc, const char *argv[]) {
     auto allocate_model_params = [](const DefaultConfig &default_config,
             const HyperParams &hyper_params,
             ModelParams &model_params,
-            const Alphabet *post_alphabet,
-            const Alphabet *response_alphabet) {
+            const Alphabet *alphabet) {
         cout << format("allocate word_file:%1%\n") % hyper_params.word_file;
-        if (post_alphabet != nullptr) {
+        if (alphabet != nullptr) {
             if(hyper_params.word_file != "" &&
                     default_config.program_mode == ProgramMode::TRAINING &&
                     default_config.input_model_file == "") {
-                model_params.encoder_lookup_table.init(*post_alphabet, hyper_params.word_file,
-                        hyper_params.word_finetune);
-                model_params.decoder_lookup_table.init(*response_alphabet, hyper_params.word_file,
+                model_params.lookup_table.init(*alphabet, hyper_params.word_file,
                         hyper_params.word_finetune);
             } else {
-                model_params.encoder_lookup_table.init(*post_alphabet, hyper_params.word_dim,
-                        true);
-                model_params.decoder_lookup_table.init(*response_alphabet, hyper_params.word_dim,
-                        true);
+                model_params.lookup_table.init(*alphabet, hyper_params.word_dim, true);
             }
         }
         model_params.attention_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
@@ -895,8 +884,7 @@ int main(int argc, const char *argv[]) {
 
     if (default_config.program_mode != ProgramMode::METRIC) {
         if (default_config.input_model_file == "") {
-            allocate_model_params(default_config, hyper_params, model_params, &post_alphabet,
-                    &response_alphabet);
+            allocate_model_params(default_config, hyper_params, model_params, &alphabet);
         } else {
             root_ptr = loadModel(default_config.input_model_file);
             loadModel(default_config, hyper_params, model_params, root_ptr.get(),
@@ -986,7 +974,7 @@ int main(int argc, const char *argv[]) {
         for (int epoch = 0; epoch < default_config.max_epoch; ++epoch) {
             cout << "epoch:" << epoch << endl;
 
-            model_params.decoder_lookup_table.E.is_fixed = false;
+            model_params.lookup_table.E.is_fixed = false;
 
             auto cmp = [&] (const ConversationPair &a, const ConversationPair &b)->bool {
                 auto len = [&] (const ConversationPair &pair)->int {
@@ -1065,7 +1053,7 @@ int main(int argc, const char *argv[]) {
                     int instance_index = getSentenceIndex(i);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
                     vector<int> word_ids = toIds(response_sentences.at(response_id),
-                            model_params.decoder_lookup_table);
+                            model_params.lookup_table);
                     vector<Node*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
                     auto result = maxLogProbabilityLoss(result_nodes, word_ids,
@@ -1084,9 +1072,9 @@ int main(int argc, const char *argv[]) {
                             cout << "post:" << post_id << endl;
                             print(post_sentences.at(post_id));
                             cout << "golden answer:" << endl;
-                            printWordIds(word_ids, model_params.decoder_lookup_table);
+                            printWordIds(word_ids, model_params.lookup_table);
                             cout << "output:" << endl;
-                            printWordIds(result.second, model_params.decoder_lookup_table);
+                            printWordIds(result.second, model_params.lookup_table);
                         }
                     }
                 }
@@ -1111,8 +1099,7 @@ int main(int argc, const char *argv[]) {
                         graph.compute();
 
                         vector<int> word_ids = toIds(response_sentences.at(
-                                    conversation_pair.response_id),
-                                model_params.decoder_lookup_table);
+                                    conversation_pair.response_id), model_params.lookup_table);
                         vector<Node*> result_nodes = toNodePointers(
                                 decoder_components.wordvector_to_onehots);
                         return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 /
