@@ -355,80 +355,71 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
     float perplex(0.0f), corpus_hit_sum(0);
     vector<int> corpus_pos_hit_amount, corpus_pos_amount;
     int size_sum = 0;
-    thread_pool pool(1);
-    mutex perplex_mutex;
     globalPoolEnabled() = false;
 
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
-        auto f = [&]() {
-            cout << "post:" << endl;
-            print(post_sentences.at(post_and_responses.post_id));
+        cout << "post:" << endl;
+        print(post_sentences.at(post_and_responses.post_id));
 
-            const vector<int> &response_ids = post_and_responses.response_ids;
-            float sum = 0.0f;
-            int hit_sum = 0;
-            int word_sum = 0;
-            vector<int> post_hit_counts, post_pos_amounts;
-            cout << "response size:" << response_ids.size() << endl;
-            for (int response_id : response_ids) {
-                Graph graph;
-                GraphBuilder graph_builder;
-                graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
-                        hyper_params, model_params, false);
-                DecoderComponents decoder_components;
-                graph_builder.forwardDecoder(graph, decoder_components,
-                        response_sentences.at(response_id), hyper_params, model_params, false);
-                graph.compute();
-                vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
-                vector<int> word_ids = transferVector<int, string>(
-                        response_sentences.at(response_id), [&](const string &w) -> int {
-                        return model_params.decoder_lookup_table.getElemId(w);
-                        });
-                int hit_count;
-                vector<int> hit_flags;
-                float perplex = computePerplex(nodes, word_ids, hit_count, hit_flags, 5);
-                sum += perplex;
-                hit_sum += hit_count;
-                word_sum += word_ids.size();
-                for (int i = 0; i < hit_flags.size(); ++i) {
-                    if (post_hit_counts.size() <= i) {
-                        post_hit_counts.push_back(0);
-                    }
-                    post_hit_counts.at(i) += hit_flags.at(i);
-
-                    if (post_pos_amounts.size() <= i) {
-                        post_pos_amounts.push_back(0);
-                    }
-                    ++ post_pos_amounts.at(i);
+        const vector<int> &response_ids = post_and_responses.response_ids;
+        float sum = 0.0f;
+        int hit_sum = 0;
+        int word_sum = 0;
+        vector<int> post_hit_counts, post_pos_amounts;
+        cout << "response size:" << response_ids.size() << endl;
+        for (int response_id : response_ids) {
+            Graph graph;
+            GraphBuilder graph_builder;
+            graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
+                    hyper_params, model_params, false);
+            DecoderComponents decoder_components;
+            graph_builder.forwardDecoder(graph, decoder_components,
+                    response_sentences.at(response_id), hyper_params, model_params, false);
+            graph.compute();
+            vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
+            vector<int> word_ids = transferVector<int, string>(
+                    response_sentences.at(response_id), [&](const string &w) -> int {
+                    return model_params.decoder_lookup_table.getElemId(w);
+                    });
+            int hit_count;
+            vector<int> hit_flags;
+            float perplex = computePerplex(nodes, word_ids, hit_count, hit_flags, 5);
+            sum += perplex;
+            hit_sum += hit_count;
+            word_sum += word_ids.size();
+            for (int i = 0; i < hit_flags.size(); ++i) {
+                if (post_hit_counts.size() <= i) {
+                    post_hit_counts.push_back(0);
                 }
-            }
-            cout << "avg_perplex:" << exp(sum/word_sum) << endl;
-            cout << "avg_hit:" << static_cast<float>(hit_sum) / word_sum << endl;
-            for (int i = 0; i < post_hit_counts.size(); ++i) {
-                cout << i << " " << static_cast<float>(post_hit_counts.at(i)) /
-                        post_pos_amounts.at(i) << endl;
-            }
-            perplex_mutex.lock();
-            perplex += sum;
-            corpus_hit_sum += hit_sum;
-            size_sum += word_sum;
+                post_hit_counts.at(i) += hit_flags.at(i);
 
-            for (int i = 0; i < post_hit_counts.size(); ++i) {
-                if (corpus_pos_amount.size() <= i) {
-                    corpus_pos_amount.push_back(0);
+                if (post_pos_amounts.size() <= i) {
+                    post_pos_amounts.push_back(0);
                 }
-                corpus_pos_amount.at(i) += post_pos_amounts.at(i);
-                if (corpus_pos_hit_amount.size() <= i) {
-                    corpus_pos_hit_amount.push_back(0);
-                }
-                corpus_pos_hit_amount.at(i) += post_hit_counts.at(i);
+                ++ post_pos_amounts.at(i);
             }
+        }
+        cout << "avg_perplex:" << exp(sum/word_sum) << endl;
+        cout << "avg_hit:" << static_cast<float>(hit_sum) / word_sum << endl;
+        for (int i = 0; i < post_hit_counts.size(); ++i) {
+            cout << i << " " << static_cast<float>(post_hit_counts.at(i)) /
+                post_pos_amounts.at(i) << endl;
+        }
+        perplex += sum;
+        corpus_hit_sum += hit_sum;
+        size_sum += word_sum;
 
-            perplex_mutex.unlock();
-        };
-        post(pool, f);
+        for (int i = 0; i < post_hit_counts.size(); ++i) {
+            if (corpus_pos_amount.size() <= i) {
+                corpus_pos_amount.push_back(0);
+            }
+            corpus_pos_amount.at(i) += post_pos_amounts.at(i);
+            if (corpus_pos_hit_amount.size() <= i) {
+                corpus_pos_hit_amount.push_back(0);
+            }
+            corpus_pos_hit_amount.at(i) += post_hit_counts.at(i);
+        }
     }
-    pool.join();
 
     perplex = exp(perplex / size_sum);
     cout << "total avg perplex:" << perplex << endl;
