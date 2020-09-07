@@ -26,12 +26,12 @@ using namespace std;
 using boost::format;
 using namespace boost::asio;
 
-std::vector<PostAndResponses> readPostAndResponsesVector(const std::string &filename) {
-    std::vector<PostAndResponses> results;
-    std::string line;
-    std::ifstream ifs(filename);
-    while (std::getline(ifs, line)) {
-        std::vector<std::string> strs;
+vector<PostAndResponses> readPostAndResponsesVector(const string &filename) {
+    vector<PostAndResponses> results;
+    string line;
+    ifstream ifs(filename);
+    while (getline(ifs, line)) {
+        vector<string> strs;
         boost::split(strs, line, boost::is_any_of(":"));
         if (strs.size() != 2) {
             abort();
@@ -39,35 +39,44 @@ std::vector<PostAndResponses> readPostAndResponsesVector(const std::string &file
         int post_id = stoi(strs.at(0));
         PostAndResponses post_and_responses;
         post_and_responses.post_id = post_id;
-        std::vector<std::string> strs2;
+        vector<string> strs2;
         boost::split(strs2, strs.at(1), boost::is_any_of(","));
         if (strs2.empty()) {
             cerr << "readPostAndResponsesVector - no response id found!" << line << endl;
             abort();
         }
-        for (std::string &str : strs2) {
+        for (string &str : strs2) {
             post_and_responses.response_ids.push_back(stoi(str));
         }
-        results.push_back(std::move(post_and_responses));
+        results.push_back(move(post_and_responses));
     }
 
     return results;
 }
 
-std::vector<ConversationPair> toConversationPairs(const PostAndResponses &post_and_responses) {
-    std::vector<ConversationPair> results;
+string getKey(int post_id, int response_id) {
+    return to_string(post_id) + "-" + to_string(response_id);
+}
+
+vector<ConversationPair> toConversationPairs(const PostAndResponses &post_and_responses,
+        const unordered_map<string, Stance> &stance_table) {
+    vector<ConversationPair> results;
     for (int response_id : post_and_responses.response_ids) {
-        ConversationPair conversation_pair(post_and_responses.post_id, response_id);
-        results.push_back(std::move(conversation_pair));
+        string key = getKey(post_and_responses.post_id, response_id);
+        const Stance &stance = stance_table.at(key);
+        ConversationPair conversation_pair(post_and_responses.post_id, response_id, stance);
+        results.push_back(move(conversation_pair));
     }
     return results;
 }
 
-std::vector<ConversationPair> toConversationPairs(
-        const std::vector<PostAndResponses> &post_and_responses_vector) {
-    std::vector<ConversationPair> results;
+vector<ConversationPair> toConversationPairs(
+        const vector<PostAndResponses> &post_and_responses_vector,
+        const unordered_map<string, Stance> &stance_table) {
+    vector<ConversationPair> results;
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
-        std::vector<ConversationPair> conversation_pairs = toConversationPairs(post_and_responses);
+        vector<ConversationPair> conversation_pairs = toConversationPairs(post_and_responses,
+                stance_table);
         for (const ConversationPair & conversation_pair : conversation_pairs) {
             results.push_back(conversation_pair);
         }
@@ -75,36 +84,96 @@ std::vector<ConversationPair> toConversationPairs(
     return results;
 }
 
-std::vector<ConversationPair> readConversationPairs(const std::string &filename) {
-    std::vector<PostAndResponses> post_and_responses_vector = readPostAndResponsesVector(filename);
-    std::vector<ConversationPair> results;
+unordered_map<string, Stance> readHumanAnnotatedStanceTable(const string &filename) {
+    unordered_map<string, Stance> result_table;
+    string line;
+    ifstream ifs(filename);
+    while (getline(ifs, line)) {
+        vector<string> strs;
+        boost::split(strs, line, boost::is_any_of(" "));
+        int post_id = stoi(strs.at(0));
+        int response_id = stoi(strs.at(1));
+        const string &stance = strs.at(2);
+        Stance stance_dist;
+        if (stance == "f") {
+            stance_dist = {1, 0, 0};
+        } else if (stance == "a") {
+            stance_dist = {0, 1, 0};
+        } else {
+            stance_dist = {0, 0, 1};
+        }
+        string key = getKey(post_id, response_id);
+        result_table.insert(make_pair(key, stance_dist));
+    }
+    return result_table;
+}
+
+unordered_map<string, Stance> readAutoAnnotatedStanceTable(const string &filename) {
+    unordered_map<string, Stance> result_table;
+    string line;
+    ifstream ifs(filename);
+    while (getline(ifs, line)) {
+        vector<string> strs;
+        boost::split(strs, line, boost::is_any_of(","));
+        int post_id = stoi(strs.at(0));
+        int response_id = stoi(strs.at(1));
+        Stance stance_dist;
+        for (int i = 0; i < 3; ++i) {
+            stance_dist.at(i) = stof(strs.at(2 + i));
+        }
+        string key = getKey(post_id, response_id);
+        result_table.insert(make_pair(key, stance_dist));
+    }
+    return result_table;
+}
+
+unordered_map<string, Stance> readStanceTable(const string &human_filename,
+        const string &auto_filename) {
+    auto human_table = readHumanAnnotatedStanceTable(human_filename);
+    cout << "human_table size:" << human_table.size() << endl;
+    auto auto_table = readAutoAnnotatedStanceTable(auto_filename);
+    cout << "auto_table size:" << auto_table.size() << endl;
+    for (const auto &it : auto_table) {
+        const auto &human_it = human_table.find(it.first);
+        if (human_it != human_table.end()) {
+            auto_table.at(it.first) = human_it->second;
+        }
+    }
+    return auto_table;
+}
+
+vector<ConversationPair> readConversationPairs(const string &filename,
+        const string &stance_human_filename,
+        const string &stance_auto_filename) {
+    auto stance_table = readStanceTable(stance_human_filename, stance_auto_filename);
+    vector<PostAndResponses> post_and_responses_vector = readPostAndResponsesVector(filename);
+    vector<ConversationPair> results;
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
-        std::vector<ConversationPair> conversation_pairs = toConversationPairs(post_and_responses);
+        vector<ConversationPair> conversation_pairs = toConversationPairs(post_and_responses,
+                stance_table);
         for (ConversationPair &conversation_pair : conversation_pairs) {
-            results.push_back(std::move(conversation_pair));
+            results.push_back(move(conversation_pair));
         }
     }
 
     return results;
 }
 
-std::vector<std::vector<std::string>> readDecodedSentences(const std::string &filename) {
-    using std::string;
-    using std::vector;
+vector<vector<string>> readDecodedSentences(const string &filename) {
     vector<vector<string>> sentences;
     string line;
-    std::ifstream ifs(filename);
-    while (std::getline(ifs, line)) {
+    ifstream ifs(filename);
+    while (getline(ifs, line)) {
         vector<string> words;
         boost::split(words, line, boost::is_any_of(" "));
-        sentences.push_back(std::move(words));
+        sentences.push_back(move(words));
     }
     return sentences;
 }
 
 bool isPureChinese(const string &word) {
-    std::regex expression("^[\u4e00-\u9fff]+$");
-    return std::regex_search(word, expression);
+    regex expression("^[\u4e00-\u9fff]+$");
+    return regex_search(word, expression);
 }
 
 bool containChinese(const utf8_string &word) {
@@ -134,30 +203,30 @@ bool isPureNumber(const utf8_string &word) {
     return true;
 }
 
-std::vector<std::vector<std::string>> readSentences(const std::string &filename) {
-    std::string line;
-    std::ifstream ifs(filename);
-    std::vector<std::vector<std::string>> results;
+vector<vector<string>> readSentences(const string &filename) {
+    string line;
+    ifstream ifs(filename);
+    vector<vector<string>> results;
 
     int i = 0;
-    while (std::getline(ifs, line)) {
-        std::vector<std::string> strs;
+    while (getline(ifs, line)) {
+        vector<string> strs;
         boost::split_regex(strs, line, boost::regex("##"));
         int index = stoi(strs.at(0));
         if (i != index) {
             abort();
         }
 
-        const std::string &sentence = strs.at(1);
-        std::vector<string> words;
+        const string &sentence = strs.at(1);
+        vector<string> words;
         boost::split(words, sentence, boost::is_any_of(" "));
-        std::vector<utf8_string> utf8_words;
+        vector<utf8_string> utf8_words;
         for (const string &word : words) {
             utf8_string s(word);
             utf8_words.push_back(s);
         }
 
-        std::vector<std::string> characters;
+        vector<string> characters;
         for (const utf8_string &word : utf8_words) {
             if (isPureEnglish(word) && !isPureNumber(word)) {
                 string w;
@@ -172,21 +241,6 @@ std::vector<std::vector<std::string>> readSentences(const std::string &filename)
             } else {
                 characters.push_back(word.cpp_str());
             }
-//            if (isPureEnglish(word) && !isPureNumber(word)) {
-//                string w;
-//                for (int i = 0; i < word.length(); ++i) {
-//                    char c = word.at(i);
-//                    if (c >= 'A' && c <= 'Z') {
-//                        c += 'a' - 'A';
-//                    }
-//                    w += c;
-//                }
-//                characters.push_back(w);
-//            } else {
-//                for (int i = 0; i < word.length(); ++i) {
-//                    characters.push_back(word.substr(i, 1).cpp_str());
-//                }
-//            }
         }
 
         characters.push_back(STOP_SYMBOL);
@@ -314,12 +368,12 @@ void reprocessSentences(const vector<PostAndResponses> bundles,
     }
 }
 
-std::vector<std::string> readBlackList(const std::string &filename) {
-    std::string line;
-    std::ifstream ifs(filename);
-    std::vector<std::string> result;
+vector<string> readBlackList(const string &filename) {
+    string line;
+    ifstream ifs(filename);
+    vector<string> result;
     cout << "black:" << endl;
-    while (std::getline(ifs, line)) {
+    while (getline(ifs, line)) {
         cout << line << endl;
         result.push_back(line);
     }
