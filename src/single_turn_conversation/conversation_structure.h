@@ -11,6 +11,12 @@ struct PostAndResponses {
 
 typedef std::array<float, 3> Stance;
 
+enum StanceCategory {
+    FAVOR = 0,
+    AGAINST = 1,
+    NEUTRAL = 2
+};
+
 struct ConversationPair {
     ConversationPair() = default;
 

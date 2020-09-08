@@ -18,6 +18,7 @@
 #include "single_turn_conversation/default_config.h"
 #include "single_turn_conversation/encoder_decoder/decoder_components.h"
 #include "single_turn_conversation/def.h"
+#include "single_turn_conversation//conversation_structure.h"
 
 using namespace std;
 
@@ -343,10 +344,11 @@ struct GraphBuilder {
             const vector<string> &answer,
             const HyperParams &hyper_params,
             ModelParams &model_params,
+            StanceCategory stance,
             bool is_training) {
         for (int i = 0; i < answer.size(); ++i) {
             forwardDecoderByOneStep(graph, decoder_components, i, i == 0 ? nullptr :
-                    &answer.at(i - 1), hyper_params, model_params, is_training);
+                    &answer.at(i - 1), hyper_params, model_params, stance, is_training);
         }
     }
 
@@ -354,6 +356,7 @@ struct GraphBuilder {
             const string *answer,
             const HyperParams &hyper_params,
             ModelParams &model_params,
+            StanceCategory stance,
             bool is_training) {
         using namespace n3ldg_plus;
         Node *last_input;
@@ -365,6 +368,10 @@ struct GraphBuilder {
         } else {
             last_input = bucket(graph, hyper_params.word_dim, 0);
         }
+
+        Node *stance_embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
+                static_cast<int>(stance));
+        last_input = n3ldg_plus::concat(graph, {last_input, stance_embedding});
 
         decoder_components.forward(graph, hyper_params, model_params, *last_input,
                 left_to_right_encoder._hiddens, is_training);
@@ -383,6 +390,7 @@ struct GraphBuilder {
             int k,
             const HyperParams &hyper_params,
             ModelParams &model_params,
+            StanceCategory stance,
             const DefaultConfig &default_config,
             const vector<string> &black_list) {
         vector<pair<vector<WordIdAndProbability>, dtype>> word_ids_result;
@@ -449,7 +457,7 @@ struct GraphBuilder {
                     DecoderComponents &decoder_components = beam.at(beam_i);
                     forwardDecoderByOneStep(graph, decoder_components, i,
                             i == 0 ? nullptr : &last_answers.at(beam_i), hyper_params,
-                            model_params, false);
+                            model_params, stance, false);
                     if (i == 0) {
                         break;
                     }
