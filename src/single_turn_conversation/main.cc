@@ -384,11 +384,11 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
         for (int response_id : response_ids) {
             Graph graph;
             GraphBuilder graph_builder;
-            graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
-                    hyper_params, model_params, false);
-            DecoderComponents decoder_components;
             StanceCategory stance_category = getStanceCategory(stance_table,
                     post_and_responses.post_id, response_id);
+            graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
+                    hyper_params, model_params, stance_category, false);
+            DecoderComponents decoder_components;
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params,
                     stance_category, false);
@@ -852,7 +852,7 @@ int main(int argc, const char *argv[]) {
         model_params.stance_embeddings.init(hyper_params.stance_dim, 3);
         model_params.attention_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
         model_params.left_to_right_encoder_params.init(hyper_params.hidden_dim,
-                hyper_params.word_dim);
+                hyper_params.word_dim + hyper_params.stance_dim);
         model_params.left_to_right_decoder_params.init(hyper_params.hidden_dim,
                 hyper_params.word_dim + hyper_params.hidden_dim + hyper_params.stance_dim);
         model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
@@ -1001,12 +1001,12 @@ int main(int argc, const char *argv[]) {
                     int post_id = train_conversation_pairs.at(instance_index).post_id;
                     conversation_pair_in_batch.push_back(train_conversation_pairs.at(
                                 instance_index));
-                    graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
-                            model_params, true);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
-                    DecoderComponents decoder_components;
                     StanceCategory stance_category = getStanceCategory(stance_table, post_id,
                             response_id);
+                    graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
+                            model_params, stance_category, true);
+                    DecoderComponents decoder_components;
                     graph_builder->forwardDecoder(graph, decoder_components,
                             response_sentences.at(response_id), hyper_params, model_params,
                             stance_category, true);
@@ -1068,8 +1068,8 @@ int main(int argc, const char *argv[]) {
                         GraphBuilder graph_builder;
                         Graph graph(false);
 
-                        graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
-                                hyper_params, model_params, true);
+//                        graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
+//                                hyper_params, model_params, true);
 
                         DecoderComponents decoder_components;
 //                        graph_builder.forwardDecoder(graph, decoder_components,

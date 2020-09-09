@@ -90,28 +90,7 @@ public:
             }
 
     dtype finalScore() const {
-//        set<int> unique_words;
-//        for (const auto &p : path_) {
-//            unique_words.insert(p.word_id);
-//        }
-//        for (int n = 2; n < 10; ++n) {
-//            if (path_.size() >= n * 2) {
-//                for (int i = path_.size() - n * 2; i>=0;--i) {
-//                    bool ngram_hit = true;
-//                    for (int j = 0; j < n; ++j) {
-//                        if (path_.at(i + j).word_id != path_.at(path_.size() - n + j).word_id) {
-//                            ngram_hit = false;
-//                            break;
-//                        }
-//                    }
-//                    if (ngram_hit) {
-//                        return -1e10;
-//                    }
-//                }
-//            }
-//        }
         return (final_log_probability ) / path_.size();
-//        return final_log_probability;
     }
 
     dtype finalLogProbability() const {
@@ -325,6 +304,7 @@ struct GraphBuilder {
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
             ModelParams &model_params,
+            StanceCategory stance_category,
             bool is_training) {
         using namespace n3ldg_plus;
         Node *hidden_bucket = bucket(graph, hyper_params.hidden_dim, 0);
@@ -335,8 +315,11 @@ struct GraphBuilder {
         }
 
         for (Node* node : encoder_lookups) {
-            left_to_right_encoder.forward(graph, model_params.left_to_right_encoder_params, *node,
-                    *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
+            Node *embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
+                    static_cast<int>(stance_category));
+            Node *concated = n3ldg_plus::concat(graph, {node, embedding});
+            left_to_right_encoder.forward(graph, model_params.left_to_right_encoder_params,
+                    *concated, *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
         }
     }
 
