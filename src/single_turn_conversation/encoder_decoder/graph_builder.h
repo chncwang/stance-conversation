@@ -319,24 +319,21 @@ vector<BeamSearchResult> mostProbableResults(
 
 struct GraphBuilder {
     vector<Node *> encoder_lookups;
-    DynamicLSTMBuilder left_to_right_encoder;
+    vector<Node *> encoder_hiddens;
 
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
             ModelParams &model_params,
             bool is_training) {
         using namespace n3ldg_plus;
-        Node *hidden_bucket = bucket(graph, hyper_params.hidden_dim, 0);
         for (const string &word : sentence) {
             Node *input_lookup = embedding(graph, model_params.lookup_table, word);
             Node *dropout_node = dropout(graph, *input_lookup, hyper_params.dropout, is_training);
             encoder_lookups.push_back(dropout_node);
         }
 
-        for (Node* node : encoder_lookups) {
-            left_to_right_encoder.forward(graph, model_params.left_to_right_encoder_params, *node,
-                    *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
-        }
+        encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
+                encoder_lookups, hyper_params.dropout, is_training);
     }
 
     void forwardDecoder(Graph &graph, DecoderComponents &decoder_components,
@@ -366,8 +363,8 @@ struct GraphBuilder {
             last_input = bucket(graph, hyper_params.word_dim, 0);
         }
 
-        decoder_components.forward(graph, hyper_params, model_params, *last_input,
-                left_to_right_encoder._hiddens, is_training);
+        decoder_components.forward(graph, hyper_params, model_params, *last_input, encoder_hiddens,
+                is_training);
 
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
                 model_params, i);
