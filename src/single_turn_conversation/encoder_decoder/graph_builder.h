@@ -352,10 +352,6 @@ struct GraphBuilder {
             last_input = bucket(graph, hyper_params.word_dim, 0);
         }
 
-        Node *stance_embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
-                static_cast<int>(stance));
-        last_input = n3ldg_plus::concat(graph, {last_input, stance_embedding});
-
         decoder_components.forward(graph, hyper_params, model_params, *last_input,
                 left_to_right_encoder._hiddens, is_training);
 
