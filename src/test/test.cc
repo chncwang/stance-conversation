@@ -9,6 +9,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 #endif
 {
     vector<UniParams*> params;
+    vector<UniParams*> vector_params;
     UniParams output_param;
 
     ModelParams() : output_param("output_param") {
@@ -16,6 +17,10 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
             UniParams* param = new UniParams(to_string(i));
             param->init(dim, dim);
             params.push_back(param);
+
+            UniParams *vector_param = new UniParams("vector" + to_string(i));
+            vector_param->init(dim, dim);
+            vector_params.push_back(vector_param);
         }
         output_param.init(3, 10 * dim);
     } 
@@ -28,23 +33,27 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     void fromJson(const Json::Value &json) override {
     }
 
-#if USE_GPU
-    vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        vector<n3ldg_cuda::Transferable *> ptrs = {&output_param};
+    template<typename T>
+    vector<T *> children() {
+        vector<T *> ptrs = {&output_param};
         for (auto x : params) {
+            ptrs.push_back(x);
+        }
+        for (auto x : vector_params) {
             ptrs.push_back(x);
         }
         return ptrs;
     }
+
+#if USE_GPU
+    vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+        return children<n3ldg_cuda::Transferable>();
+    }
 #endif
 
 protected:
-    virtual vector<Tunable<BaseParam>*> tunableComponents() override {
-        vector<Tunable<BaseParam> *> ptrs = {&output_param};
-        for (auto x : params) {
-            ptrs.push_back(x);
-        }
-        return ptrs;
+    vector<Tunable<BaseParam>*> tunableComponents() override {
+        return children<Tunable<BaseParam>>();
     }
 };
 
@@ -71,21 +80,29 @@ int main() {
                 Node *x = n3ldg_plus::linear(*graph, *params.params.at(j), *bucket);
                 nodes.push_back(x);
             }
-            Node * y = n3ldg_plus::concatToMatrix(*graph, nodes);
+            MatrixNode * y = n3ldg_plus::concatToMatrix(*graph, nodes);
+            Node *v = n3ldg_plus::linear(*graph, *params.vector_params.at(i),
+                    *n3ldg_plus::bucket(*graph, dim, 1));
+            y = n3ldg_plus::pointwiseMultiply(*graph, *y, *v);
+            Node *col_sum = n3ldg_plus::matrixColSum(*graph, *y);
+            Node *z;
             if (i > 0) {
-                y = n3ldg_plus::concat(*graph, {y, n3ldg_plus::bucket(*graph, i * dim, 0)});
+                z = n3ldg_plus::concat(*graph, {y, n3ldg_plus::bucket(*graph,
+                            i * dim - col_sum->getDim(), 0), col_sum});
+            } else {
+                z = y;
             }
-            ys.push_back(y);
+            ys.push_back(z);
         }
         Node *output = n3ldg_plus::averagePool(*graph, ys);
         output = n3ldg_plus::linear(*graph, params.output_param, *output);
         output = n3ldg_plus::softmax(*graph, *output);
         vector<Node *> v = {output};
         graph->compute();
-        output->getVal().print();
-        cout << "answer:" << answer << endl;
+//        output->getVal().print();
+//        cout << "answer:" << answer << endl;
         dtype loss = crossEntropyLoss(v, {answer}, 1);
-        cout << "loss:" << loss << endl;
+//        cout << "loss:" << loss << endl;
         return make_pair(graph, loss);
     };
 
