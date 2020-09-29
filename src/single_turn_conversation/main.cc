@@ -960,10 +960,10 @@ int main(int argc, const char *argv[]) {
         model_update._reg = hyper_params.l2_reg;
         model_update.setParams(model_params.tunableParams());
 
+#if USE_DOUBLE
         CheckGrad grad_checker;
-        if (default_config.check_grad) {
-            grad_checker.init(model_params.tunableParams());
-        }
+        grad_checker.init(model_params.tunableParams());
+#endif
 
         dtype last_loss_sum = 1e10f;
         dtype loss_sum = 0.0f;
@@ -1090,7 +1090,8 @@ int main(int argc, const char *argv[]) {
 
                 graph.backward();
 
-                if (default_config.check_grad) {
+#if USE_DOUBLE
+                 {
                     auto loss_function = [&](const ConversationPair &conversation_pair) -> dtype {
                         GraphBuilder graph_builder;
                         Graph graph(false);
@@ -1109,14 +1110,14 @@ int main(int argc, const char *argv[]) {
                                     conversation_pair.response_id), model_params.lookup_table);
                         vector<Node*> result_nodes = toNodePointers(
                                 decoder_components.wordvector_to_onehots);
-                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 /
-                                word_ids.size()).first;
+                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum).first;
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;
                     grad_checker.check<ConversationPair>(loss_function, conversation_pair_in_batch,
                             "");
                 }
+#endif
 
                 if (hyper_params.optimizer == Optimizer::ADAM) {
                     model_update.updateAdam(10.0f);

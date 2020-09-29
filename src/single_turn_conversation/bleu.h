@@ -299,7 +299,7 @@ float computeDist(const vector<CandidateAndReferences> &candidate_and_references
     return static_cast<float>(distinctions.size()) / sentence_len_sum;
 }
 
-float vectorCos(const dtype *a, const dtype *b, int len) {
+dtype vectorCos(const dtype *a, const dtype *b, int len) {
     float inner_prod_sum = 0;
     float a_len_square = 0;
     float b_len_square = 0;
@@ -353,8 +353,8 @@ float computeGreedyMatching(const CandidateAndReferences &candidate_and_refs,
     return max_g;
 }
 
-vector<float> sentenceAvgEmbedding(const vector<string> &s, LookupTable<Param>& embedding_table) {
-    vector<float> result;
+vector<dtype> sentenceAvgEmbedding(const vector<string> &s, LookupTable<Param>& embedding_table) {
+    vector<dtype> result;
     int dim = embedding_table.E.outDim();
     result.resize(dim);
     for (int i = 0; i < embedding_table.E.outDim(); ++i) {
@@ -369,7 +369,7 @@ vector<float> sentenceAvgEmbedding(const vector<string> &s, LookupTable<Param>& 
         }
     }
 
-    for (float &v : result) {
+    for (dtype &v : result) {
         v /= s.size();
     }
 
@@ -406,8 +406,8 @@ float computeEmbeddingAvg(const CandidateAndReferences &candidate_and_refs,
     return max_avg;
 }
 
-vector<float> sentenceExtrema(const vector<string> &s, LookupTable<Param>& embedding_table) {
-    vector<float> result;
+vector<dtype> sentenceExtrema(const vector<string> &s, LookupTable<Param>& embedding_table) {
+    vector<dtype> result;
     int dim = embedding_table.E.outDim();
     result.resize(dim);
     for (int i = 0; i < embedding_table.E.outDim(); ++i) {
@@ -428,7 +428,7 @@ vector<float> sentenceExtrema(const vector<string> &s, LookupTable<Param>& embed
     return result;
 }
 
-float extrema(const vector<string> &a, const vector<string> &b,
+dtype extrema(const vector<string> &a, const vector<string> &b,
         LookupTable<Param>& embedding_table) {
     auto av = sentenceExtrema(a, embedding_table);
     auto bv = sentenceExtrema(b, embedding_table);

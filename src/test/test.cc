@@ -117,7 +117,7 @@ int main() {
         return make_pair(graph, loss);
     };
 
-    for (int i = 0; i < 0; ++i) {
+    for (int i = 0; i < 10; ++i) {
         int answer = i % 3;
         auto p = f(answer);
         p.first->backward();
