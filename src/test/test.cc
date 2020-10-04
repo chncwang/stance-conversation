@@ -94,7 +94,7 @@ int main() {
             MatrixNode * y = n3ldg_plus::concatToMatrix(*graph, nodes);
             Node *v = n3ldg_plus::linear(*graph, *params.vector_params.at(i),
                     *n3ldg_plus::bucket(*graph, dim, 1));
-            y = n3ldg_plus::pointwiseMultiply(*graph, *y, *v);
+            y = n3ldg_plus::matrixPointwiseMultiply(*graph, *y, *v);
             Node *col_sum = n3ldg_plus::matrixColSum(*graph, *y);
             Node *z;
             if (i > 0) {

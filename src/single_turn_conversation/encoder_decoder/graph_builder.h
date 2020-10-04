@@ -77,7 +77,11 @@ string getSentence(const vector<int> &word_ids_vector, const ModelParams &model_
 
 class BeamSearchResult {
 public:
-    BeamSearchResult() {
+    BeamSearchResult(Graph &graph, TransformerDecoderParams &params,
+            const vector<Node *> &encoder_hiddens,
+            dtype dropout,
+            bool is_training) : decoder_components_(graph, params, encoder_hiddens, dropout,
+                is_training) {
         ngram_counts_ = {0, 0, 0};
     }
     BeamSearchResult(const BeamSearchResult &beam_search_result) = default;
@@ -89,28 +93,7 @@ public:
             }
 
     dtype finalScore() const {
-//        set<int> unique_words;
-//        for (const auto &p : path_) {
-//            unique_words.insert(p.word_id);
-//        }
-//        for (int n = 2; n < 10; ++n) {
-//            if (path_.size() >= n * 2) {
-//                for (int i = path_.size() - n * 2; i>=0;--i) {
-//                    bool ngram_hit = true;
-//                    for (int j = 0; j < n; ++j) {
-//                        if (path_.at(i + j).word_id != path_.at(path_.size() - n + j).word_id) {
-//                            ngram_hit = false;
-//                            break;
-//                        }
-//                    }
-//                    if (ngram_hit) {
-//                        return -1e10;
-//                    }
-//                }
-//            }
-//        }
         return (final_log_probability ) / path_.size();
-//        return final_log_probability;
     }
 
     dtype finalLogProbability() const {
@@ -363,8 +346,7 @@ struct GraphBuilder {
             last_input = bucket(graph, hyper_params.word_dim, 0);
         }
 
-        decoder_components.forward(graph, hyper_params, model_params, *last_input, encoder_hiddens,
-                is_training);
+        decoder_components.forward(*last_input);
 
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
                 model_params, i);
