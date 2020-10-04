@@ -324,6 +324,7 @@ struct GraphBuilder {
             const HyperParams &hyper_params,
             ModelParams &model_params,
             bool is_training) {
+        decoder_components.decoder.prepare();
         for (int i = 0; i < answer.size(); ++i) {
             forwardDecoderByOneStep(graph, decoder_components, i, i == 0 ? nullptr :
                     &answer.at(i - 1), hyper_params, model_params, is_training);
