@@ -17,7 +17,7 @@ struct DecoderComponents {
             dtype dropout,
             bool is_training) : decoder(graph, params, encoder_hiddens, dropout, is_training) {}
 
-    void forward(Node &input) {
+    void forward(vector<Node*> &input) {
         decoder.forward(input);
     }
 

@@ -325,9 +325,33 @@ struct GraphBuilder {
             ModelParams &model_params,
             bool is_training) {
         decoder_components.decoder.prepare();
+        using namespace n3ldg_plus;
+        vector<Node *> inputs;
         for (int i = 0; i < answer.size(); ++i) {
-            forwardDecoderByOneStep(graph, decoder_components, i, i == 0 ? nullptr :
-                    &answer.at(i - 1), hyper_params, model_params, is_training);
+            Node *last_input;
+            if (i > 0) {
+                Node *decoder_lookup = embedding(graph, model_params.lookup_table,
+                        answer.at(i - 1));
+                decoder_lookup = dropout(graph, *decoder_lookup, hyper_params.dropout,
+                        is_training);
+                decoder_components.decoder_lookups.push_back(decoder_lookup);
+                last_input = decoder_components.decoder_lookups.at(i - 1);
+            } else {
+                last_input = bucket(graph, hyper_params.word_dim, 0);
+            }
+            inputs.push_back(last_input);
+        }
+
+        decoder_components.forward(inputs);
+
+        for (int i = 0; i < answer.size(); ++i) {
+            Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
+                    hyper_params, model_params, i);
+            decoder_components.decoder_to_wordvectors.push_back(decoder_to_wordvector);
+            Node *wordvector_to_onehot = linearWordVector(graph, model_params.lookup_table.nVSize,
+                    model_params.lookup_table.E, *decoder_to_wordvector);
+            Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot);
+            decoder_components.wordvector_to_onehots.push_back(softmax);
         }
     }
 
@@ -336,26 +360,6 @@ struct GraphBuilder {
             const HyperParams &hyper_params,
             ModelParams &model_params,
             bool is_training) {
-        using namespace n3ldg_plus;
-        Node *last_input;
-        if (i > 0) {
-            Node *decoder_lookup = embedding(graph, model_params.lookup_table, *answer);
-            decoder_lookup = dropout(graph, *decoder_lookup, hyper_params.dropout, is_training);
-            decoder_components.decoder_lookups.push_back(decoder_lookup);
-            last_input = decoder_components.decoder_lookups.at(i - 1);
-        } else {
-            last_input = bucket(graph, hyper_params.word_dim, 0);
-        }
-
-        decoder_components.forward(*last_input);
-
-        Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
-                model_params, i);
-        decoder_components.decoder_to_wordvectors.push_back(decoder_to_wordvector);
-        Node *wordvector_to_onehot = linearWordVector(graph, model_params.lookup_table.nVSize,
-                model_params.lookup_table.E, *decoder_to_wordvector);
-        Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot);
-        decoder_components.wordvector_to_onehots.push_back(softmax);
     }
 
     pair<vector<WordIdAndProbability>, dtype> forwardDecoderUsingBeamSearch(Graph &graph,

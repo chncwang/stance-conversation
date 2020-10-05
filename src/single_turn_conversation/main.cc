@@ -1026,13 +1026,9 @@ int main(int argc, const char *argv[]) {
             int duration_count = 1e3;
 
             int corpus_word_sum = 0;
-            int profiler_i = 0;
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
-//                if (profiler_i++ > 100) {
-//                    break;
-//                }
                 model_update._alpha = hyper_params.learning_rate *
                     min(1.0f, (float)(iteration + 1) / hyper_params.warm_up_iterations);
                 cout << "learning rate:" << model_update._alpha << endl;
@@ -1165,34 +1161,34 @@ int main(int argc, const char *argv[]) {
                 ++iteration;
             }
 
-//            float perplex = metricTestPosts(hyper_params, model_params,
-//                    dev_post_and_responses, post_sentences, response_sentences);
-//            cout << "dev ppl:" << perplex << endl;
+            float perplex = metricTestPosts(hyper_params, model_params,
+                    dev_post_and_responses, post_sentences, response_sentences);
+            cout << "dev ppl:" << perplex << endl;
 
             cout << "loss_sum:" << loss_sum << " last_loss_sum:" << endl;
-//            if (loss_sum > last_loss_sum) {
-//                if (epoch == 0) {
-//                    cerr << "loss is larger than last epoch but epoch is 0" << endl;
-//                    abort();
-//                }
-//                model_update._alpha *= 0.1f;
-//                hyper_params.learning_rate = model_update._alpha;
-//                cout << "learning_rate decay:" << model_update._alpha << endl;
-//                std::shared_ptr<Json::Value> root = loadModel(last_saved_model);
-//                model_params.fromJson((*root)["model_params"]);
-//#if USE_GPU
-//                model_params.copyFromHostToDevice();
-//#endif
-//            } else {
-//                if (iteration - batch_count > hyper_params.warm_up_iterations) {
-//                    model_update._alpha = (model_update._alpha - hyper_params.min_learning_rate) *
-//                        hyper_params.learning_rate_decay + hyper_params.min_learning_rate;
-//                }
-//                hyper_params.learning_rate = model_update._alpha;
-//                cout << "learning_rate now:" << hyper_params.learning_rate << endl;
-//                last_saved_model = saveModel(hyper_params, model_params,
-//                        default_config.output_model_file_prefix, epoch);
-//            }
+            if (loss_sum > last_loss_sum) {
+                if (epoch == 0) {
+                    cerr << "loss is larger than last epoch but epoch is 0" << endl;
+                    abort();
+                }
+                model_update._alpha *= 0.1f;
+                hyper_params.learning_rate = model_update._alpha;
+                cout << "learning_rate decay:" << model_update._alpha << endl;
+                std::shared_ptr<Json::Value> root = loadModel(last_saved_model);
+                model_params.fromJson((*root)["model_params"]);
+#if USE_GPU
+                model_params.copyFromHostToDevice();
+#endif
+            } else {
+                if (iteration - batch_count > hyper_params.warm_up_iterations) {
+                    model_update._alpha = (model_update._alpha - hyper_params.min_learning_rate) *
+                        hyper_params.learning_rate_decay + hyper_params.min_learning_rate;
+                }
+                hyper_params.learning_rate = model_update._alpha;
+                cout << "learning_rate now:" << hyper_params.learning_rate << endl;
+                last_saved_model = saveModel(hyper_params, model_params,
+                        default_config.output_model_file_prefix, epoch);
+            }
 
             last_loss_sum = loss_sum;
             loss_sum = 0;
