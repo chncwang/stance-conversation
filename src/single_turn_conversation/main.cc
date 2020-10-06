@@ -519,13 +519,15 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
 
     cout << "decodeTestPosts begin" << endl;
     hyper_params.print();
-    vector<CandidateAndReferences> candidate_and_references_vector;
-    map<string, int64_t> overall_flops;
-    array<float, 4> cider_sums = {0, 0, 0, 0};
+    array<vector<CandidateAndReferences>, 3> candidate_and_references_vector_arr;
+    array<array<float, 4>, 3> cider_sums_arr;
+    for (auto &it : cider_sums_arr) {
+        it = {0, 0, 0, 0};
+    }
     int loop_i = 0;
-    vector <float> greedy_matching_similarities;
-    vector <float> avg_matching_similarities;
-    vector <float> extrema_similarities;
+    array<vector <float>, 3> greedy_matching_similarities;
+    array<vector <float>, 3> avg_matching_similarities;
+    array<vector <float>, 3> extrema_similarities;
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
         ++loop_i;
         cout << "post:" << endl;
@@ -539,7 +541,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
             Graph graph;
             GraphBuilder graph_builder;
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
-                    hyper_params, model_params, false);
+                    hyper_params, model_params, stance, false);
             vector<DecoderComponents> decoder_components_vector;
             decoder_components_vector.resize(hyper_params.beam_size);
             auto pair = graph_builder.forwardDecoderUsingBeamSearch(graph,
@@ -581,44 +583,43 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
             }
 
             CandidateAndReferences candidate_and_references(decoded_word_ids, id_references);
-            candidate_and_references_vector.push_back(candidate_and_references);
+            candidate_and_references_vector_arr.at(stance).push_back(candidate_and_references);
 
             for (int ngram = 1; ngram <=4; ++ngram) {
-                float bleu_value = computeBleu(candidate_and_references_vector, ngram);
+                float bleu_value = computeBleu(candidate_and_references_vector_arr.at(stance),
+                        ngram);
                 cout << "bleu_" << ngram << ":" << bleu_value << endl;
                 float bleu_mean, bleu_deviation;
                 cout << boost::format("bleu_%1% mean:%2% deviation:%3%") % ngram % bleu_mean %
                     bleu_deviation << endl;
-                float dist_value = computeDist(candidate_and_references_vector, ngram);
-                cout << "dist_" << ngram << ":" << dist_value << endl;
-                float cider = computeCIDEr(candidate_and_references, ngram_idf_tables.at(ngram - 1),
+                float dist_value = computeDist(candidate_and_references_vector_arr.at(stance),
                         ngram);
-                cider_sums.at(ngram - 1) += cider;
-                cout << "cider_" << ngram << ":" << cider_sums.at(ngram - 1) / loop_i << endl;
+                cout << "dist_" << ngram << ":" << dist_value << endl;
+                float cider = computeCIDEr(candidate_and_references,
+                        ngram_idf_tables.at(ngram - 1), ngram);
+                cider_sums_arr.at(stance).at(ngram - 1) += cider;
+                cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
+                    loop_i << endl;
             }
-            float idf_value = computeEntropy(candidate_and_references_vector, all_idf);
-            cout << "idf:" << idf_value << endl;
-            float matched_idf = computeMatchedEntropy(candidate_and_references_vector, all_idf);
-            cout << "matched idf:" << matched_idf << endl;
             float greedy_matching_sim = computeGreedyMatching(candidate_and_references,
                     original_embeddings);
-            greedy_matching_similarities.push_back(greedy_matching_sim);
+            greedy_matching_similarities.at(stance).push_back(greedy_matching_sim);
             float greedy_matching_sim_mean, greedy_matching_sim_sd;
-            computeMeanAndStandardDeviation(greedy_matching_similarities, greedy_matching_sim_mean,
-                    greedy_matching_sim_sd);
+            computeMeanAndStandardDeviation(greedy_matching_similarities.at(stance),
+                    greedy_matching_sim_mean, greedy_matching_sim_sd);
             cout << boost::format("greedy matching mean:%1% standard_deviation:%2%") %
                 greedy_matching_sim_mean % greedy_matching_sim_sd << endl;
             float avg_sim = computeEmbeddingAvg(candidate_and_references, original_embeddings);
-            avg_matching_similarities.push_back(avg_sim);
+            avg_matching_similarities.at(stance).push_back(avg_sim);
             float avg_matching_sim_mean, avg_matching_sim_sd;
-            computeMeanAndStandardDeviation(avg_matching_similarities, avg_matching_sim_mean,
-                    avg_matching_sim_sd);
+            computeMeanAndStandardDeviation(avg_matching_similarities.at(stance),
+                    avg_matching_sim_mean, avg_matching_sim_sd);
             cout << boost::format("embedding average mean:%1% standard_deviation:%2%") %
                 avg_matching_sim_mean % avg_matching_sim_sd << endl;
             float extrema = computeExtrema(candidate_and_references, original_embeddings);
-            extrema_similarities.push_back(extrema);
+            extrema_similarities.at(stance).push_back(extrema);
             float extrema_mean, extrema_sd;
-            computeMeanAndStandardDeviation(extrema_similarities, extrema_mean, extrema_sd);
+            computeMeanAndStandardDeviation(extrema_similarities.at(stance), extrema_mean, extrema_sd);
             cout << boost::format("extrema mean:%1% standard_deviation:%2%") % extrema_mean %
                 extrema_sd << endl;
         }
