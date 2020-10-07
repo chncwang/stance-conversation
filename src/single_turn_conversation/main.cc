@@ -304,6 +304,7 @@ string saveModel(const HyperParams &hyper_params, ModelParams &model_params,
     Json::Value root;
     root["hyper_params"] = hyper_params.toJson();
     root["model_params"] = model_params.toJson();
+    root["epoch"] = epoch;
     Json::StreamWriterBuilder builder;
     builder["commentStyle"] = "None";
     builder["indentation"] = "";
@@ -341,10 +342,12 @@ shared_ptr<Json::Value> loadModel(const string &filename) {
 
 void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
         ModelParams &model_params,
+        int &epoch,
         const Json::Value *root,
         const function<void(const DefaultConfig &default_config, const HyperParams &hyper_params,
             ModelParams &model_params, const Alphabet*)> &allocate_model_params) {
     hyper_params.fromJson((*root)["hyper_params"]);
+    epoch = (*root)["epoch"].asInt();
     hyper_params.print();
     allocate_model_params(default_config, hyper_params, model_params, nullptr);
     model_params.fromJson((*root)["model_params"]);
@@ -894,12 +897,13 @@ int main(int argc, const char *argv[]) {
                 hyper_params.hidden_dim + hyper_params.word_dim, false);
     };
 
+    int saved_epoch = -1;
     if (default_config.program_mode != ProgramMode::METRIC) {
         if (default_config.input_model_file == "") {
             allocate_model_params(default_config, hyper_params, model_params, &alphabet);
         } else {
             root_ptr = loadModel(default_config.input_model_file);
-            loadModel(default_config, hyper_params, model_params, root_ptr.get(),
+            loadModel(default_config, hyper_params, model_params, saved_epoch, root_ptr.get(),
                     allocate_model_params);
             hyper_params.learning_rate_decay = ini_reader.GetFloat("hyper", "learning_rate_decay",
                     0);
@@ -951,7 +955,7 @@ int main(int argc, const char *argv[]) {
             cout << format("model_file_path:%1%") % model_file_path << endl;
             ModelParams model_params;
             shared_ptr<Json::Value> root_ptr = loadModel(model_file_path);
-            loadModel(default_config, hyper_params, model_params, root_ptr.get(),
+            loadModel(default_config, hyper_params, model_params, saved_epoch, root_ptr.get(),
                     allocate_model_params);
             float perplex = metricTestPosts(hyper_params, model_params,
                     dev_post_and_responses, post_sentences, response_sentences);
@@ -980,10 +984,9 @@ int main(int argc, const char *argv[]) {
         profiler.SetEnabled(false);
         profiler.BeginEvent("total");
 
-        int iteration = 0;
         string last_saved_model;
 
-        for (int epoch = 0; epoch < default_config.max_epoch; ++epoch) {
+        for (int epoch = saved_epoch + 1; epoch < default_config.max_epoch; ++epoch) {
             cout << "epoch:" << epoch << endl;
 
             model_params.lookup_table.E.is_fixed = false;
@@ -999,6 +1002,7 @@ int main(int argc, const char *argv[]) {
             int valid_len = train_conversation_pairs.size() / hyper_params.batch_size *
                 hyper_params.batch_size;
             int batch_count = valid_len / hyper_params.batch_size;
+            int iteration = epoch * batch_count;
             cout << boost::format("valid_len:%1% batch_count:%2%") % valid_len % batch_count <<
                 endl;
             default_random_engine engine(default_config.seed);
@@ -1015,13 +1019,21 @@ int main(int argc, const char *argv[]) {
             unique_ptr<Metric> metric = unique_ptr<Metric>(new Metric);
             using namespace std::chrono;
             int duration_count = 1e3;
+            model_update._belta2 = 0.98;
+            model_update._belta1 = 0.9;
+            model_update._eps = 1e-9;
 
             int corpus_word_sum = 0;
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
-                model_update._alpha = hyper_params.learning_rate *
-                    min(1.0f, (float)(iteration + 1) / hyper_params.warm_up_iterations);
+                if (iteration + 1 < hyper_params.warm_up_iterations) {
+                    model_update._alpha = pow(hyper_params.hidden_dim, -0.5) *
+                        (iteration + 1) * pow(hyper_params.warm_up_iterations, -1.5);
+                } else {
+                    model_update._alpha = pow(hyper_params.hidden_dim, -0.5) *
+                        pow(iteration + 1, -0.5);
+                }
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
