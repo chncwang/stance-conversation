@@ -39,7 +39,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
-            &left_to_right_decoder_params, &attention_params};
+            &left_to_right_decoder_params};
     }
 #endif
 
