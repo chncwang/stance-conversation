@@ -888,7 +888,6 @@ int main(int argc, const char *argv[]) {
                 model_params.lookup_table.init(*alphabet, hyper_params.word_dim, true);
             }
         }
-        model_params.attention_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
         model_params.transformer_encoder_params.init(hyper_params.hidden_layer,
                 hyper_params.hidden_dim, hyper_params.word_dim, hyper_params.head_count, 512);
         model_params.left_to_right_decoder_params.init(hyper_params.hidden_layer,
@@ -1121,7 +1120,9 @@ int main(int argc, const char *argv[]) {
                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
                                 hyper_params, model_params, true);
 
-                        DecoderComponents decoder_components;
+                        DecoderComponents decoder_components(graph,
+                                model_params.left_to_right_decoder_params,
+                                graph_builder.encoder_hiddens, hyper_params.dropout, true);
                         graph_builder.forwardDecoder(graph, decoder_components,
                                 response_sentences.at(conversation_pair.response_id),
                                 hyper_params, model_params, true);

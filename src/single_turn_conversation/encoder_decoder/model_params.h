@@ -15,12 +15,10 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     UniParams hidden_to_wordvector_params;
     TransformerEncoderParams transformer_encoder_params;
     TransformerDecoderParams left_to_right_decoder_params;
-    AdditiveAttentionParams attention_params;
 
     ModelParams() : lookup_table("lookup_table"),
     hidden_to_wordvector_params("hidden_to_wordvector_params"),
-    transformer_encoder_params("encoder"), left_to_right_decoder_params("decoder"),
-    attention_params("attention_params") {}
+    transformer_encoder_params("encoder"), left_to_right_decoder_params("decoder") {}
 
     Json::Value toJson() const override {
         Json::Value json;
@@ -28,7 +26,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         json["hidden_to_wordvector_params"] = hidden_to_wordvector_params.toJson();
         json["transformer_encoder_params"] = transformer_encoder_params.toJson();
         json["left_to_right_decoder_params"] = left_to_right_decoder_params.toJson();
-        json["attention_params"] = attention_params.toJson();
         return json;
     }
 
@@ -37,7 +34,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         hidden_to_wordvector_params.fromJson(json["hidden_to_wordvector_params"]);
         transformer_encoder_params.fromJson(json["left_to_right_encoder_params"]);
         left_to_right_decoder_params.fromJson(json["left_to_right_decoder_params"]);
-        attention_params.fromJson(json["attention_params"]);
     }
 
 #if USE_GPU
@@ -50,7 +46,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
-            &left_to_right_decoder_params, &attention_params};
+            &left_to_right_decoder_params};
     }
 };
 
