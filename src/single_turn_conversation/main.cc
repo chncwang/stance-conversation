@@ -892,7 +892,7 @@ int main(int argc, const char *argv[]) {
                 hyper_params.hidden_dim, hyper_params.word_dim, hyper_params.head_count, 512);
         model_params.left_to_right_decoder_params.init(hyper_params.hidden_layer,
                 hyper_params.hidden_dim, hyper_params.word_dim, hyper_params.head_count, 512);
-        model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
+        model_params.hidden_to_wordvector_params.init(model_params.lookup_table.nVSize,
                 hyper_params.hidden_dim, false);
     };
 
