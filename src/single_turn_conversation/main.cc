@@ -202,20 +202,6 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     }
     hyper_params.learning_rate = learning_rate;
 
-    float min_learning_rate = ini_reader.GetReal("hyper", "min_learning_rate", 0.0001f);
-    if (min_learning_rate < 0.0f) {
-        cerr << "min_learning_rate wrong" << endl;
-        abort();
-    }
-    hyper_params.min_learning_rate = min_learning_rate;
-
-    float learning_rate_decay = ini_reader.GetReal("hyper", "learning_rate_decay", 0.9f);
-    if (learning_rate_decay <= 0.0f || learning_rate_decay > 1.0f) {
-        cerr << "decay wrong" << endl;
-        abort();
-    }
-    hyper_params.learning_rate_decay = learning_rate_decay;
-
     int warm_up_iterations = ini_reader.GetInteger("hyper", "warm_up_iterations", 4000);
     if (warm_up_iterations < 0) {
         cerr << "warm_up_iterations wrong" << endl;
@@ -904,10 +890,6 @@ int main(int argc, const char *argv[]) {
             root_ptr = loadModel(default_config.input_model_file);
             loadModel(default_config, hyper_params, model_params, saved_epoch, root_ptr.get(),
                     allocate_model_params);
-            hyper_params.learning_rate_decay = ini_reader.GetFloat("hyper", "learning_rate_decay",
-                    0);
-            hyper_params.min_learning_rate = ini_reader.GetFloat("hyper", "min_learning_rate",
-                    0);
             hyper_params.learning_rate = ini_reader.GetFloat("hyper", "learning_rate",
                     0);
             hyper_params.batch_size = ini_reader.GetFloat("hyper", "batch_size", 1);
@@ -1033,6 +1015,7 @@ int main(int argc, const char *argv[]) {
                     model_update._alpha = pow(hyper_params.hidden_dim, -0.5) *
                         pow(iteration + 1, -0.5);
                 }
+                model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
@@ -1184,12 +1167,6 @@ int main(int argc, const char *argv[]) {
                 model_params.copyFromHostToDevice();
 #endif
             } else {
-                if (iteration - batch_count > hyper_params.warm_up_iterations) {
-                    model_update._alpha = (model_update._alpha - hyper_params.min_learning_rate) *
-                        hyper_params.learning_rate_decay + hyper_params.min_learning_rate;
-                }
-                hyper_params.learning_rate = model_update._alpha;
-                cout << "learning_rate now:" << hyper_params.learning_rate << endl;
                 last_saved_model = saveModel(hyper_params, model_params,
                         default_config.output_model_file_prefix, epoch);
             }
