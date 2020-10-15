@@ -350,6 +350,8 @@ struct GraphBuilder {
             decoder_components.decoder_to_wordvectors.push_back(decoder_to_wordvector);
             Node *wordvector_to_onehot = linearWordVector(graph, model_params.lookup_table.nVSize,
                     model_params.lookup_table.E, *decoder_to_wordvector);
+            wordvector_to_onehot = bias(graph, model_params.output_bias_params,
+                    *wordvector_to_onehot);
             Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot);
             decoder_components.wordvector_to_onehots.push_back(softmax);
         }
