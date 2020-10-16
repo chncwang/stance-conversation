@@ -25,13 +25,13 @@ struct DecoderComponents {
             ModelParams &model_params,
             int i) {
         using namespace n3ldg_plus;
-//        vector<Node *> concat_inputs = {decoder.hiddenLayers().back().at(i),
-//            i == 0 ? bucket(graph, hyper_params.word_dim, 0) :
-//                static_cast<Node*>(decoder_lookups.at(i - 1))};
-//        Node *concat_node = concat(graph, concat_inputs);
+        vector<Node *> concat_inputs = {decoder.hiddenLayers().back().at(i),
+            i == 0 ? bucket(graph, hyper_params.word_dim, 0) :
+                static_cast<Node*>(decoder_lookups.at(i - 1))};
+        Node *concat_node = concat(graph, concat_inputs);
 
         Node *decoder_to_wordvector = n3ldg_plus::linear(graph,
-                model_params.hidden_to_wordvector_params, *decoder.hiddenLayers().back().at(i));
+                model_params.hidden_to_wordvector_params, *concat_node);
         return decoder_to_wordvector;
     }
 };
