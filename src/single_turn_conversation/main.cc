@@ -1019,7 +1019,6 @@ int main(int argc, const char *argv[]) {
                     model_update._alpha = hyper_params.learning_rate * (hyper_params.lr_decay ?
                             hyper_params.warm_up_iterations * pow(iteration + 1, -0.5) : 1);
                 }
-                model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
