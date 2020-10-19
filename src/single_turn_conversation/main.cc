@@ -202,7 +202,7 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     }
     hyper_params.learning_rate = learning_rate;
 
-    float lr_decay = ini_reader.GetReal("hyper", "lr_decay", true);
+    float lr_decay = ini_reader.GetBoolean("hyper", "lr_decay", false);
     hyper_params.lr_decay = lr_decay;
 
     int warm_up_iterations = ini_reader.GetInteger("hyper", "warm_up_iterations", 4000);
