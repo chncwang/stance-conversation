@@ -202,6 +202,9 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     }
     hyper_params.learning_rate = learning_rate;
 
+    float lr_decay = ini_reader.GetReal("hyper", "lr_decay", true);
+    hyper_params.lr_decay = lr_decay;
+
     int warm_up_iterations = ini_reader.GetInteger("hyper", "warm_up_iterations", 4000);
     if (warm_up_iterations < 0) {
         cerr << "warm_up_iterations wrong" << endl;
@@ -1014,7 +1017,7 @@ int main(int argc, const char *argv[]) {
                         (iteration + 1) * pow(hyper_params.warm_up_iterations, -1.5);
                 } else {
                     model_update._alpha = pow(hyper_params.hidden_dim, -0.5) *
-                        pow(iteration + 1, -0.5);
+                        (hyper_params.lr_decay ?  pow(iteration + 1, -0.5) : 1);
                 }
                 model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
