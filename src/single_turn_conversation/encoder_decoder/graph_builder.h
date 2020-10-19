@@ -337,7 +337,8 @@ struct GraphBuilder {
                 decoder_components.decoder_lookups.push_back(decoder_lookup);
                 last_input = decoder_components.decoder_lookups.at(i - 1);
             } else {
-                last_input = bucket(graph, hyper_params.word_dim, 0);
+//                last_input = bucket(graph, hyper_params.word_dim, 0);
+                last_input = embedding(graph, model_params.begin_emb, 0);
             }
             inputs.push_back(last_input);
         }

@@ -884,6 +884,8 @@ int main(int argc, const char *argv[]) {
         model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
                 hyper_params.hidden_dim, false);
         model_params.output_bias_params.initAsBias(model_params.lookup_table.nVSize);
+        function<dtype(int, int)> init = [](int, int)->dtype {return 1;};
+        model_params.begin_emb.init(hyper_params.word_dim, 1, &init);
     };
 
     int saved_epoch = -1;
@@ -1017,7 +1019,7 @@ int main(int argc, const char *argv[]) {
                         (iteration + 1) /hyper_params.warm_up_iterations;
                 } else {
                     model_update._alpha = hyper_params.learning_rate * (hyper_params.lr_decay ?
-                            hyper_params.warm_up_iterations * pow(iteration + 1, -0.5) : 1);
+                            pow(hyper_params.warm_up_iterations, 0.5) * pow(iteration + 1, -0.5) : 1);
                 }
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();

@@ -16,11 +16,12 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     TransformerEncoderParams transformer_encoder_params;
     TransformerDecoderParams left_to_right_decoder_params;
     BiasParam output_bias_params;
+    Param begin_emb;
 
     ModelParams() : lookup_table("lookup_table"),
     hidden_to_wordvector_params("hidden_to_wordvector_params"),
     transformer_encoder_params("encoder"), left_to_right_decoder_params("decoder"),
-    output_bias_params("output_bias_params") {}
+    output_bias_params("output_bias_params"), begin_emb("begin_emb") {}
 
     Json::Value toJson() const override {
         Json::Value json;
@@ -29,6 +30,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         json["transformer_encoder_params"] = transformer_encoder_params.toJson();
         json["left_to_right_decoder_params"] = left_to_right_decoder_params.toJson();
         json["output_bias_params"] = output_bias_params.toJson();
+        json["begin_emb"] = begin_emb.toJson();
         return json;
     }
 
@@ -38,19 +40,20 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         transformer_encoder_params.fromJson(json["left_to_right_encoder_params"]);
         left_to_right_decoder_params.fromJson(json["left_to_right_decoder_params"]);
         output_bias_params.fromJson(json["output_bias_params"]);
+        begin_emb.fromJson(json["begin_emb"]);
     }
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
-            &left_to_right_decoder_params, &output_bias_params};
+            &left_to_right_decoder_params, &output_bias_params, &begin_emb};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
-            &left_to_right_decoder_params, &output_bias_params};
+            &left_to_right_decoder_params, &output_bias_params, &begin_emb};
     }
 };
 
