@@ -1013,11 +1013,11 @@ int main(int argc, const char *argv[]) {
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
                 if (iteration + 1 < hyper_params.warm_up_iterations) {
-                    model_update._alpha = pow(hyper_params.hidden_dim, -0.5) *
-                        (iteration + 1) * pow(hyper_params.warm_up_iterations, -1.5);
+                    model_update._alpha = hyper_params.learning_rate *
+                        (iteration + 1) /hyper_params.warm_up_iterations;
                 } else {
-                    model_update._alpha = pow(hyper_params.hidden_dim, -0.5) *
-                        (hyper_params.lr_decay ?  pow(iteration + 1, -0.5) : 1);
+                    model_update._alpha = hyper_params.learning_rate * (hyper_params.lr_decay ?
+                            hyper_params.warm_up_iterations * pow(iteration + 1, -0.5) : 1);
                 }
                 model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
