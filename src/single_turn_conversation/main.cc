@@ -883,7 +883,6 @@ int main(int argc, const char *argv[]) {
                 hyper_params.hidden_dim, hyper_params.word_dim, hyper_params.head_count, 512);
         model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
                 hyper_params.hidden_dim, false);
-        model_params.output_bias_params.initAsBias(model_params.lookup_table.nVSize);
         function<dtype(int, int)> init = [](int, int)->dtype {return 1;};
         model_params.begin_emb.init(hyper_params.word_dim, 1, &init);
     };
