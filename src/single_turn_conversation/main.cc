@@ -872,7 +872,7 @@ int main(int argc, const char *argv[]) {
                     default_config.program_mode == ProgramMode::TRAINING &&
                     default_config.input_model_file == "") {
                 model_params.lookup_table.init(*alphabet, hyper_params.word_file,
-                        hyper_params.word_finetune);
+                        hyper_params.word_finetune, 1);
             } else {
                 model_params.lookup_table.init(*alphabet, hyper_params.word_dim, true);
             }
