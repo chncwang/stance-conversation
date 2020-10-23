@@ -311,8 +311,7 @@ struct GraphBuilder {
         using namespace n3ldg_plus;
         for (const string &word : sentence) {
             Node *input_lookup = embedding(graph, model_params.lookup_table, word);
-            Node *dropout_node = dropout(graph, *input_lookup, hyper_params.dropout, is_training);
-            encoder_lookups.push_back(dropout_node);
+            encoder_lookups.push_back(input_lookup);
         }
 
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
@@ -332,8 +331,6 @@ struct GraphBuilder {
             if (i > 0) {
                 Node *decoder_lookup = embedding(graph, model_params.lookup_table,
                         answer.at(i - 1));
-                decoder_lookup = dropout(graph, *decoder_lookup, hyper_params.dropout,
-                        is_training);
                 decoder_components.decoder_lookups.push_back(decoder_lookup);
                 last_input = decoder_components.decoder_lookups.at(i - 1);
             } else {
