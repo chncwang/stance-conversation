@@ -573,6 +573,7 @@ int main(int argc, const char *argv[]) {
     cout << "default_config:" << endl;
     default_config.print();
     globalPoolEnabled() = (default_config.program_mode == ProgramMode::TRAINING);
+    globalLimitedDimEnabled() = true;
 
 #if USE_GPU
     n3ldg_cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
