@@ -364,6 +364,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
         const vector<vector<string>> &post_sentences,
         const vector<vector<string>> &response_sentences,
         const unordered_map<string, Stance> &stance_table) {
+    globalPoolEnabled() = false;
     cout << "metricTestPosts begin" << endl;
     hyper_params.print();
 
@@ -434,6 +435,8 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
         ++i;
     }
     delete graph;
+
+    globalPoolEnabled() = true;
 
     return (float)right_count / total_count;
 }
@@ -569,7 +572,7 @@ int main(int argc, const char *argv[]) {
     default_config = parseDefaultConfig(ini_reader);
     cout << "default_config:" << endl;
     default_config.print();
-    globalPoolEnabled() = false;
+    globalPoolEnabled() = (default_config.program_mode == ProgramMode::TRAINING);
 
 #if USE_GPU
     n3ldg_cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
