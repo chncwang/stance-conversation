@@ -405,23 +405,32 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
         }
         graph->compute();
 
-        auto res_reps_copy = res_reps;
         for (int res_id : post_and_responses.response_ids) {
+            auto res_reps_copy = res_reps;
             const vector<string> &res = response_sentences.at(res_id);
             Graph inner_graph;
             Node *rep = sentenceRep(inner_graph, res, hyper_params, model_params,
                     model_params.response_encoder_params, model_params.response_rep_params,
                     nullptr, false);
             inner_graph.compute();
-            auto rep_cpu_v = rep->val().toCpu();
-            Node *bucket = n3ldg_plus::bucket(*graph, rep_cpu_v);
-            res_reps_copy.at(i % hyper_params.batch_size) = bucket;
+//            auto rep_cpu_v = rep->val().toCpu();
+//            Node *bucket = n3ldg_plus::bucket(inner_graph, rep_cpu_v);
+            res_reps_copy.at(i % hyper_params.batch_size) = rep;
+            int j = 0;
+            for (Node *node : res_reps_copy) {
+                if (i % hyper_params.batch_size != j) {
+                    auto cpu_v = node->val().toCpu();
+                    Node *bucket = n3ldg_plus::bucket(inner_graph, cpu_v);
+                    res_reps_copy.at(j) = bucket;
+                }
+                j++;
+            }
 
             StanceCategory stance_category = getStanceCategory(stance_table,
                     post_and_responses.post_id, res_id);
             Node *stance_conditioned_post = post_reps.at(stance_category);
-            auto probs = selectionProbs(*graph, {stance_conditioned_post}, res_reps_copy);
-            graph->compute();
+            auto probs = selectionProbs(inner_graph, {stance_conditioned_post}, res_reps_copy);
+            inner_graph.compute();
             int predicted_id = predict(probs).front();
             ++total_count;
             if (predicted_id == i % hyper_params.batch_size) {
