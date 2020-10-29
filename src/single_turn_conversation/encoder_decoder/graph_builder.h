@@ -18,7 +18,8 @@
 #include "single_turn_conversation/default_config.h"
 #include "single_turn_conversation/encoder_decoder/decoder_components.h"
 #include "single_turn_conversation/def.h"
-#include "single_turn_conversation//conversation_structure.h"
+#include "single_turn_conversation/conversation_structure.h"
+#include "single_turn_conversation/encoder_decoder/res_sel_model.h"
 
 using namespace std;
 
@@ -298,8 +299,8 @@ vector<BeamSearchResult> mostProbableResults(
 }
 
 struct GraphBuilder {
-    vector<Node *> encoder_lookups;
     DynamicLSTMBuilder left_to_right_encoder;
+    DynamicLSTMBuilder sel_response_encoder;
 
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
@@ -307,6 +308,7 @@ struct GraphBuilder {
             StanceCategory stance_category,
             bool is_training) {
         using namespace n3ldg_plus;
+        vector<Node *> encoder_lookups;
         Node *hidden_bucket = bucket(graph, hyper_params.hidden_dim, 0);
         for (const string &word : sentence) {
             Node *input_lookup = embedding(graph, model_params.lookup_table, word);
@@ -314,12 +316,26 @@ struct GraphBuilder {
             encoder_lookups.push_back(dropout_node);
         }
 
+        Node *embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
+                static_cast<int>(stance_category));
         for (Node* node : encoder_lookups) {
-            Node *embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
-                    static_cast<int>(stance_category));
             Node *concated = n3ldg_plus::concat(graph, {node, embedding});
             left_to_right_encoder.forward(graph, model_params.left_to_right_encoder_params,
                     *concated, *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
+        }
+    }
+
+    void forwardSel(Graph &graph, const vector<string> &sentence,
+            const HyperParams &hyper_params,
+            ModelParams &model_params,
+            bool is_training) {
+        using namespace n3ldg_plus;
+        Node *hidden_bucket = bucket(graph, hyper_params.hidden_dim, 0);
+        for (const string &word : sentence) {
+            Node *input_lookup = embedding(graph, model_params.lookup_table, word);
+            Node *dropout_node = dropout(graph, *input_lookup, hyper_params.dropout, is_training);
+            sel_response_encoder.forward(graph, model_params.sel_encoder_params,
+                    *dropout_node, *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
         }
     }
 
@@ -329,9 +345,11 @@ struct GraphBuilder {
             ModelParams &model_params,
             StanceCategory stance,
             bool is_training) {
+        Node *embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
+                static_cast<int>(stance));
         for (int i = 0; i < answer.size(); ++i) {
             forwardDecoderByOneStep(graph, decoder_components, i, i == 0 ? nullptr :
-                    &answer.at(i - 1), hyper_params, model_params, stance, is_training);
+                    &answer.at(i - 1), hyper_params, model_params, *embedding, is_training);
         }
     }
 
@@ -339,7 +357,7 @@ struct GraphBuilder {
             const string *answer,
             const HyperParams &hyper_params,
             ModelParams &model_params,
-            StanceCategory stance,
+            Node &stance,
             bool is_training) {
         using namespace n3ldg_plus;
         Node *last_input;
@@ -351,9 +369,9 @@ struct GraphBuilder {
         } else {
             last_input = bucket(graph, hyper_params.word_dim, 0);
         }
-
+        last_input = concat(graph, {last_input, &stance});
         decoder_components.forward(graph, hyper_params, model_params, *last_input,
-                left_to_right_encoder._hiddens, is_training);
+                left_to_right_encoder._hiddens, sel_response_encoder._hiddens, is_training);
 
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
                 model_params, i);
@@ -433,10 +451,10 @@ struct GraphBuilder {
                 }
 
                 for (int beam_i = 0; beam_i < beam.size(); ++beam_i) {
-                    DecoderComponents &decoder_components = beam.at(beam_i);
-                    forwardDecoderByOneStep(graph, decoder_components, i,
-                            i == 0 ? nullptr : &last_answers.at(beam_i), hyper_params,
-                            model_params, stance, false);
+                    DecoderComponents &decoder_components = beam.at(beam_i); // TODO
+//                    forwardDecoderByOneStep(graph, decoder_components, i,
+//                            i == 0 ? nullptr : &last_answers.at(beam_i), hyper_params,
+//                            model_params, stance, false);
                     if (i == 0) {
                         break;
                     }

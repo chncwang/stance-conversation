@@ -13,10 +13,12 @@ struct DecoderComponents {
     std::vector<Node *> wordvector_to_onehots;
     DynamicLSTMBuilder decoder;
     vector<Node*> contexts;
+    vector<Node*> sel_contexts;
 
     void forward(Graph &graph, const HyperParams &hyper_params, ModelParams &model_params,
             Node &input,
             vector<Node *> &encoder_hiddens,
+            vector<Node *> &selected_res,
             bool is_training) {
         using namespace n3ldg_plus;
         shared_ptr<AdditiveAttentionBuilder> attention_builder(new AdditiveAttentionBuilder);
@@ -27,7 +29,13 @@ struct DecoderComponents {
         attention_builder->forward(graph, model_params.attention_params, encoder_hiddens, *guide);
         contexts.push_back(attention_builder->_hidden);
 
-        vector<Node *> ins = {&input, attention_builder->_hidden};
+        shared_ptr<AdditiveAttentionBuilder> sel_attention_builder(new AdditiveAttentionBuilder);
+
+        sel_attention_builder->forward(graph, model_params.attention_params_for_sel, selected_res,
+                *guide);
+        sel_contexts.push_back(sel_attention_builder->_hidden);
+
+        vector<Node *> ins = {&input, attention_builder->_hidden, sel_attention_builder->_hidden};
         Node *concat = n3ldg_plus::concat(graph, ins);
 
         decoder.forward(graph, model_params.left_to_right_decoder_params, *concat, *hidden_bucket,
@@ -38,7 +46,7 @@ struct DecoderComponents {
             ModelParams &model_params,
             int i) {
         using namespace n3ldg_plus;
-        vector<Node *> concat_inputs = {contexts.at(i), decoder._hiddens.at(i),
+        vector<Node *> concat_inputs = {contexts.at(i), sel_contexts.at(i), decoder._hiddens.at(i),
             i == 0 ? bucket(graph, hyper_params.word_dim, 0) :
                 static_cast<Node*>(decoder_lookups.at(i - 1))};
         Node *concat_node = concat(graph, concat_inputs);

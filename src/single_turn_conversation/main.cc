@@ -28,6 +28,7 @@
 #include "single_turn_conversation/bleu.h"
 #include "single_turn_conversation/perplex.h"
 #include "single_turn_conversation/default_config.h"
+#include "single_turn_conversation/encoder_decoder/res_sel_model.h"
 #include "single_turn_conversation/encoder_decoder/graph_builder.h"
 #include "single_turn_conversation/encoder_decoder/hyper_params.h"
 #include "single_turn_conversation/encoder_decoder/model_params.h"
@@ -319,7 +320,7 @@ shared_ptr<Json::Value> loadModel(const string &filename) {
     ifstream is(filename.c_str());
     shared_ptr<Json::Value> root(new Json::Value);
     if (is) {
-        cout << "loading model..." << endl;
+        cout << "loading model... " << filename << endl;
         stringstream sstr;
         sstr << is.rdbuf();
         string str = sstr.str();
@@ -347,6 +348,17 @@ void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
     hyper_params.fromJson((*root)["hyper_params"]);
     hyper_params.print();
     allocate_model_params(default_config, hyper_params, model_params, nullptr);
+    model_params.fromJson((*root)["model_params"]);
+#if USE_GPU
+    model_params.copyFromHostToDevice();
+#endif
+}
+
+void loadResSelModel(ResSelModelParams &model_params,
+        const Json::Value *root,
+        const function<void(ResSelModelParams &model_params,
+            const Alphabet*)> &allocate_model_params) {
+    allocate_model_params(model_params, nullptr);
     model_params.fromJson((*root)["model_params"]);
 #if USE_GPU
     model_params.copyFromHostToDevice();
@@ -389,9 +401,9 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params, stance_category, false);
             DecoderComponents decoder_components;
-            graph_builder.forwardDecoder(graph, decoder_components,
-                    response_sentences.at(response_id), hyper_params, model_params,
-                    stance_category, false);
+//            graph_builder.forwardDecoder(graph, decoder_components,
+//                    response_sentences.at(response_id), hyper_params, model_params,
+//                    stance_category, false);
             graph.compute();
             vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
             vector<int> word_ids = transferVector<int, string>(
@@ -777,7 +789,6 @@ int main(int argc, const char *argv[]) {
     auto all_idf = calculateIdf(all_sentences);
 
     Alphabet alphabet;
-    shared_ptr<Json::Value> root_ptr;
     unordered_map<string, int> word_counts;
     if (default_config.program_mode == ProgramMode::TRAINING) {
         auto wordStat = [&]() {
@@ -818,19 +829,6 @@ int main(int argc, const char *argv[]) {
         word_counts[unknownkey] = 1000000000;
         alphabet.init(word_counts, hyper_params.word_cutoff);
         cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
-    } else if (default_config.split_unknown_words) {
-        root_ptr = loadModel(default_config.input_model_file);
-        Json::Value &root = *root_ptr;
-        vector<string> words = stringVectorFromJson(
-                root["model_params"]["lookup_table"]["word_ids"]["m_id_to_string"]);
-        unordered_set<string> word_set = knownWords(words);
-        auto &v = default_config.program_mode == ProgramMode::METRIC ? dev_post_and_responses :
-            test_post_and_responses;
-        auto post_ids_and_response_ids = PostAndResponseIds(v);
-        post_sentences = reprocessSentences(post_sentences, word_set,
-                post_ids_and_response_ids.first);
-        response_sentences = reprocessSentences(response_sentences, word_set,
-                post_ids_and_response_ids.second);
     }
 
     ModelParams model_params;
@@ -853,14 +851,19 @@ int main(int argc, const char *argv[]) {
         }
         model_params.stance_embeddings.init(hyper_params.stance_dim, 3);
         model_params.attention_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
+        model_params.attention_params_for_sel.init(hyper_params.hidden_dim,
+                hyper_params.hidden_dim);
         model_params.left_to_right_encoder_params.init(hyper_params.hidden_dim,
                 hyper_params.word_dim + hyper_params.stance_dim);
         model_params.left_to_right_decoder_params.init(hyper_params.hidden_dim,
-                hyper_params.word_dim + hyper_params.hidden_dim);
+                hyper_params.word_dim + 2 * hyper_params.hidden_dim + hyper_params.stance_dim);
+        model_params.sel_encoder_params.init(hyper_params.hidden_dim, hyper_params.word_dim);
         model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
-                hyper_params.hidden_dim + hyper_params.hidden_dim + hyper_params.word_dim, false);
+                3 * hyper_params.hidden_dim + hyper_params.word_dim,
+                false);
     };
 
+    shared_ptr<Json::Value> root_ptr;
     if (default_config.program_mode != ProgramMode::METRIC) {
         if (default_config.input_model_file == "") {
             allocate_model_params(default_config, hyper_params, model_params, &alphabet);
@@ -878,6 +881,21 @@ int main(int argc, const char *argv[]) {
             hyper_params.print();
         }
     }
+    root_ptr.reset();
+
+    ResSelModelParams res_sel_model_params;
+    shared_ptr<Json::Value> res_sel_root_ptr;
+    string RES_SEL_PATH = "/var/wqs/response-selection-model";
+    res_sel_root_ptr = loadModel(RES_SEL_PATH);
+    auto allocateResSelModel = [](ResSelModelParams &model_params, const Alphabet *alphabet) {
+        model_params.left_to_right_encoder_params.init(1024, 310);
+        model_params.post_rep_params.init(1024, 1024);
+        model_params.response_encoder_params.init(1024, 300);
+        model_params.response_rep_params.init(1024, 1024);
+        model_params.stance_embeddings.init(10, 3);
+    };
+
+    loadResSelModel(res_sel_model_params, res_sel_root_ptr.get(), allocateResSelModel);
 
     auto black_list = readBlackList(default_config.black_list_file);
 
@@ -996,6 +1014,51 @@ int main(int argc, const char *argv[]) {
                 auto getSentenceIndex = [batch_i, batch_count](int i) {
                     return i * batch_count + batch_i;
                 };
+
+                vector<int> sel_res_ids;
+                if (batch_i % 10 == 0) {
+                    for (int i = 0; i < batch_size; ++i) {
+                        int instance_index = getSentenceIndex(i);
+                        int id = train_conversation_pairs.at(instance_index).response_id;
+                        sel_res_ids.push_back(id);
+                    }
+                } else {
+                    Graph *res_sel_graph = new Graph;
+                    vector<Node *> post_reps, res_reps;
+                    for (int i = 0; i < batch_size; ++i) {
+                        int instance_index = getSentenceIndex(i);
+                        int post_id = train_conversation_pairs.at(instance_index).post_id;
+                        conversation_pair_in_batch.push_back(train_conversation_pairs.at(
+                                    instance_index));
+                        int response_id = train_conversation_pairs.at(instance_index).response_id;
+                        StanceCategory stance_category = getStanceCategory(stance_table, post_id,
+                                response_id);
+                        Node *post_rep = sentenceRep(*res_sel_graph, post_sentences.at(post_id),
+                                res_sel_model_params,
+                                res_sel_model_params.left_to_right_encoder_params,
+                                res_sel_model_params.post_rep_params, &stance_category);
+                        post_reps.push_back(post_rep);
+                        Node *res_rep = sentenceRep(*res_sel_graph, response_sentences.at(response_id),
+                                res_sel_model_params, res_sel_model_params.response_encoder_params,
+                                res_sel_model_params.response_rep_params, nullptr);
+                        res_reps.push_back(res_rep);
+                    }
+                    res_sel_graph->compute();
+                    auto probs = selectionProbs(*res_sel_graph, post_reps, res_reps);
+                    res_sel_graph->compute();
+                    for (int i = 0; i < batch_size; ++i) {
+                        Node *n = probs.at(i);
+                        auto cpu_v = n->val().toCpu();
+                        cpu_v.at(i) = -1;
+                        int selected = *max_element(cpu_v.begin(), cpu_v.end());
+                        int instance_index = getSentenceIndex(selected);
+                        int id = train_conversation_pairs.at(instance_index).response_id;
+                        sel_res_ids.push_back(id);
+                    }
+
+                    delete res_sel_graph;
+                }
+
                 for (int i = 0; i < batch_size; ++i) {
                     shared_ptr<GraphBuilder> graph_builder(new GraphBuilder);
                     graph_builders.push_back(graph_builder);
@@ -1008,6 +1071,10 @@ int main(int argc, const char *argv[]) {
                             response_id);
                     graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
                             model_params, stance_category, true);
+                    int sel_res_id = sel_res_ids.at(i);
+                    graph_builder->forwardSel(graph, response_sentences.at(sel_res_id),
+                            hyper_params, model_params, true);
+
                     DecoderComponents decoder_components;
                     graph_builder->forwardDecoder(graph, decoder_components,
                             response_sentences.at(response_id), hyper_params, model_params,
@@ -1053,6 +1120,9 @@ int main(int argc, const char *argv[]) {
                                 train_conversation_pairs.at(instance_index).stance;
                             cout << boost::format("stance: %1%,%2%,%3%") % stance.at(0) %
                                 stance.at(1) % stance.at(2) << endl;
+                            int sel_id = sel_res_ids.at(i);
+                            cout << "sel:" << endl;
+                            print(response_sentences.at(sel_id));
                             cout << "golden answer:" << endl;
                             printWordIds(word_ids, model_params.lookup_table);
                             cout << "output:" << endl;
