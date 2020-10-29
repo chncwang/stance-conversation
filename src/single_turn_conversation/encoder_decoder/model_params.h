@@ -25,7 +25,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     Json::Value toJson() const override {
         Json::Value json;
         json["lookup_table"] = lookup_table.toJson();
-        json["stance_embeddings"] = lookup_table.toJson();
+        json["stance_embeddings"] = stance_embeddings.toJson();
         json["left_to_right_encoder_params"] = left_to_right_encoder_params.toJson();
         json["response_encoder_params"] = response_encoder_params.toJson();
         json["post_rep_params"] = post_rep_params.toJson();
@@ -35,7 +35,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 
     void fromJson(const Json::Value &json) override {
         lookup_table.fromJson(json["lookup_table"]);
-        lookup_table.fromJson(json["stance_embeddings"]);
+        stance_embeddings.fromJson(json["stance_embeddings"]);
         left_to_right_encoder_params.fromJson(json["left_to_right_encoder_params"]);
         response_encoder_params.fromJson(json["response_encoder_params"]);
         post_rep_params.fromJson(json["post_rep_params"]);
