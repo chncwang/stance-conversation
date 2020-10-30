@@ -372,6 +372,7 @@ StanceCategory getStanceCategory(const unordered_map<string, Stance> &stance_tab
 }
 
 float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
+        ResSelModelParams &res_params,
         const vector<PostAndResponses> &post_and_responses_vector,
         const vector<vector<string>> &post_sentences,
         const vector<vector<string>> &response_sentences,
@@ -383,9 +384,46 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
     int size_sum = 0;
     globalPoolEnabled() = false;
 
+    Graph *res_sel_graph = nullptr;
+    vector<Node *> res_reps;
+    int loop_i = -1;
+
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
+        ++loop_i;
+        if (loop_i % hyper_params.batch_size == 0) {
+            res_reps.clear();
+            if (res_sel_graph != nullptr) {
+                delete res_sel_graph;
+            }
+            res_sel_graph = new Graph;
+            for (int j = 0; j < hyper_params.batch_size; ++j) {
+                int res_id = j * 9937 + loop_i;
+                const vector<string> &res = response_sentences.at(res_id);
+                Node *rep = sentenceRep(*res_sel_graph, res, res_params,
+                        res_params.response_encoder_params, res_params.response_rep_params,
+                        nullptr);
+                res_reps.push_back(rep);
+            }
+            res_sel_graph->compute();
+        }
+
         cout << "post:" << endl;
-        print(post_sentences.at(post_and_responses.post_id));
+        int post_id = post_and_responses.post_id;
+        print(post_sentences.at(post_id));
+        const auto &post = post_sentences.at(post_id);
+
+        vector<int> seleted_ids;
+        for (int stance  = 0; stance < 3; ++stance) {
+            StanceCategory s = static_cast<StanceCategory>(stance);
+            Node *post_rep = sentenceRep(*res_sel_graph, post, res_params,
+                    res_params.left_to_right_encoder_params, res_params.post_rep_params, &s);
+            auto probs = selectionProbs(*res_sel_graph, {post_rep}, res_reps);
+            res_sel_graph->compute();
+            auto v = probs.front()->val().toCpu();
+            int id = *max_element(v.begin(), v.end());
+            int res_id = id * 9937 + loop_i;
+            seleted_ids.push_back(res_id);
+        }
 
         const vector<int> &response_ids = post_and_responses.response_ids;
         float sum = 0.0f;
@@ -398,12 +436,19 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             GraphBuilder graph_builder;
             StanceCategory stance_category = getStanceCategory(stance_table,
                     post_and_responses.post_id, response_id);
+            cout << "stance:" << stance_category << endl;
+            cout << "sel:" << endl;
+            print(response_sentences.at(seleted_ids.at(stance_category)));
+            cout << "gold:" << endl;
+            print(response_sentences.at(response_id));
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params, stance_category, false);
+            graph_builder.forwardSel(graph, response_sentences.at(seleted_ids.at(stance_category)),
+                    hyper_params, model_params, false);
             DecoderComponents decoder_components;
-//            graph_builder.forwardDecoder(graph, decoder_components,
-//                    response_sentences.at(response_id), hyper_params, model_params,
-//                    stance_category, false);
+            graph_builder.forwardDecoder(graph, decoder_components,
+                    response_sentences.at(response_id), hyper_params, model_params,
+                    stance_category, false);
             graph.compute();
             vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
             vector<int> word_ids = transferVector<int, string>(
@@ -449,6 +494,8 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             corpus_pos_hit_amount.at(i) += post_hit_counts.at(i);
         }
     }
+
+    delete res_sel_graph;
 
     perplex = exp(perplex / size_sum);
     cout << "total avg perplex:" << perplex << endl;
@@ -934,7 +981,7 @@ int main(int argc, const char *argv[]) {
             shared_ptr<Json::Value> root_ptr = loadModel(model_file_path);
             loadModel(default_config, hyper_params, model_params, root_ptr.get(),
                     allocate_model_params);
-            float perplex = metricTestPosts(hyper_params, model_params,
+            float perplex = metricTestPosts(hyper_params, model_params, res_sel_model_params,
                     dev_post_and_responses, post_sentences, response_sentences, stance_table);
             cout << format("model %1% perplex is %2%") % model_file_path % perplex << endl;
             if (min_perplex > perplex) {
@@ -1001,6 +1048,9 @@ int main(int argc, const char *argv[]) {
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
+                if (batch_i > 100) {
+                    break;
+                }
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
                 int batch_size = batch_i == batch_count ?
@@ -1109,25 +1159,23 @@ int main(int argc, const char *argv[]) {
                     unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
                     analyze(result.second, word_ids, *local_metric);
 
-                    if (local_metric->getAccuracy() < 1.0f) {
-                        static int count_for_print;
-                        if (++count_for_print % 100 == 0) {
-                            count_for_print = 0;
-                            int post_id = train_conversation_pairs.at(instance_index).post_id;
-                            cout << "post:" << post_id << endl;
-                            print(post_sentences.at(post_id));
-                            const auto &stance =
-                                train_conversation_pairs.at(instance_index).stance;
-                            cout << boost::format("stance: %1%,%2%,%3%") % stance.at(0) %
-                                stance.at(1) % stance.at(2) << endl;
-                            int sel_id = sel_res_ids.at(i);
-                            cout << "sel:" << endl;
-                            print(response_sentences.at(sel_id));
-                            cout << "golden answer:" << endl;
-                            printWordIds(word_ids, model_params.lookup_table);
-                            cout << "output:" << endl;
-                            printWordIds(result.second, model_params.lookup_table);
-                        }
+                    static int count_for_print;
+                    if ((++count_for_print % 100 == 0) || (batch_i % 10 == 0 && i == 0)) {
+                        count_for_print = 0;
+                        int post_id = train_conversation_pairs.at(instance_index).post_id;
+                        cout << "post:" << post_id << endl;
+                        print(post_sentences.at(post_id));
+                        const auto &stance =
+                            train_conversation_pairs.at(instance_index).stance;
+                        cout << boost::format("stance: %1%,%2%,%3%") % stance.at(0) %
+                            stance.at(1) % stance.at(2) << endl;
+                        int sel_id = sel_res_ids.at(i);
+                        cout << "sel:" << endl;
+                        print(response_sentences.at(sel_id));
+                        cout << "golden answer:" << endl;
+                        printWordIds(word_ids, model_params.lookup_table);
+                        cout << "output:" << endl;
+                        printWordIds(result.second, model_params.lookup_table);
                     }
                 }
                 cout << "loss:" << loss_sum << " ppl:" << exp(loss_sum / (batch_i + 1)) << endl;
@@ -1186,8 +1234,8 @@ int main(int argc, const char *argv[]) {
                 ++iteration;
             }
 
-            float perplex = metricTestPosts(hyper_params, model_params, dev_post_and_responses,
-                    post_sentences, response_sentences, stance_table);
+            float perplex = metricTestPosts(hyper_params, model_params, res_sel_model_params,
+                    dev_post_and_responses, post_sentences, response_sentences, stance_table);
             cout << "dev ppl:" << perplex << endl;
 
             cout << "loss_sum:" << loss_sum << " last_loss_sum:" << endl;
