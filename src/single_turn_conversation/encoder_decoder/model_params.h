@@ -61,8 +61,8 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
         return {&lookup_table, &stance_embeddings, &hidden_to_wordvector_params,
-            &left_to_right_encoder_params, &left_to_right_decoder_params, &attention_params,
-            &attention_params_for_sel};
+            &left_to_right_encoder_params, &left_to_right_decoder_params, &sel_encoder_params,
+            &attention_params, &attention_params_for_sel};
     }
 };
 

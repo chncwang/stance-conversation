@@ -236,6 +236,8 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     string word_file = ini_reader.Get("hyper", "word_file", "");
     hyper_params.word_file = word_file;
 
+    hyper_params.copy_rate = ini_reader.GetFloat("hyper", "copy_rate", 0.1);
+
     float l2_reg = ini_reader.GetReal("hyper", "l2_reg", 0.0f);
     if (l2_reg < 0.0f || l2_reg > 1.0f) {
         cerr << "l2_reg:" << l2_reg << endl;
@@ -1048,9 +1050,6 @@ int main(int argc, const char *argv[]) {
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
-                if (batch_i > 100) {
-                    break;
-                }
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
                 int batch_size = batch_i == batch_count ?
@@ -1066,7 +1065,7 @@ int main(int argc, const char *argv[]) {
                 };
 
                 vector<int> sel_res_ids;
-                if (batch_i % 10 == 0) {
+                if (batch_i % 10 < 10 * hyper_params.copy_rate) {
                     for (int i = 0; i < batch_size; ++i) {
                         int instance_index = getSentenceIndex(i);
                         int id = train_conversation_pairs.at(instance_index).response_id;
