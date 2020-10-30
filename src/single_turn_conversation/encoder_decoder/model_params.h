@@ -29,7 +29,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     Json::Value toJson() const override {
         Json::Value json;
         json["lookup_table"] = lookup_table.toJson();
-        json["stance_embeddings"] = lookup_table.toJson();
+        json["stance_embeddings"] = stance_embeddings.toJson();
         json["hidden_to_wordvector_params"] = hidden_to_wordvector_params.toJson();
         json["left_to_right_encoder_params"] = left_to_right_encoder_params.toJson();
         json["left_to_right_decoder_params"] = left_to_right_decoder_params.toJson();
@@ -41,7 +41,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 
     void fromJson(const Json::Value &json) override {
         lookup_table.fromJson(json["lookup_table"]);
-        lookup_table.fromJson(json["stance_embeddings"]);
+        stance_embeddings.fromJson(json["stance_embeddings"]);
         hidden_to_wordvector_params.fromJson(json["hidden_to_wordvector_params"]);
         left_to_right_encoder_params.fromJson(json["left_to_right_encoder_params"]);
         left_to_right_decoder_params.fromJson(json["left_to_right_decoder_params"]);
