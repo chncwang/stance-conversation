@@ -423,7 +423,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             res_sel_graph->compute();
             auto v = probs.front()->val().toCpu();
             int id = *max_element(v.begin(), v.end());
-            int res_id = id * 9937 + loop_i;
+            int res_id = id * 9937 + loop_i / hyper_params.batch_size * hyper_params.batch_size;
             seleted_ids.push_back(res_id);
         }
 
