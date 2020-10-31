@@ -422,7 +422,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             auto probs = selectionProbs(*res_sel_graph, {post_rep}, res_reps);
             res_sel_graph->compute();
             auto v = probs.front()->val().toCpu();
-            int id = *max_element(v.begin(), v.end());
+            int id = max_element(v.begin(), v.end()) - v.begin();
             int res_id = id * 9937 + loop_i / hyper_params.batch_size * hyper_params.batch_size;
             seleted_ids.push_back(res_id);
         }
@@ -1099,7 +1099,7 @@ int main(int argc, const char *argv[]) {
                         Node *n = probs.at(i);
                         auto cpu_v = n->val().toCpu();
                         cpu_v.at(i) = -1;
-                        int selected = *max_element(cpu_v.begin(), cpu_v.end());
+                        int selected = max_element(cpu_v.begin(), cpu_v.end()) - cpu_v.begin();
                         int instance_index = getSentenceIndex(selected);
                         int id = train_conversation_pairs.at(instance_index).response_id;
                         sel_res_ids.push_back(id);
@@ -1252,9 +1252,6 @@ int main(int argc, const char *argv[]) {
                 model_params.copyFromHostToDevice();
 #endif
             } else {
-                model_update._alpha = (model_update._alpha - hyper_params.min_learning_rate) *
-                    hyper_params.learning_rate_decay + hyper_params.min_learning_rate;
-                hyper_params.learning_rate = model_update._alpha;
                 cout << "learning_rate now:" << hyper_params.learning_rate << endl;
                 last_saved_model = saveModel(hyper_params, model_params,
                         default_config.output_model_file_prefix, epoch);
