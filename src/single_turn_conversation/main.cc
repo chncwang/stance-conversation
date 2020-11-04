@@ -549,13 +549,22 @@ map<StanceCategory, vector<int>> splitResponsesByStance(int post_id,
 }
 
 void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
+        ResSelModelParams &res_sel_model_params,
         DefaultConfig &default_config,
         const vector<PostAndResponses> &post_and_responses_vector,
         const vector<vector<string>> &post_sentences,
         const vector<vector<string>> &response_sentences,
         const unordered_map<string, float> &all_idf,
         const vector<string> &black_list,
-        const unordered_map<string, Stance> &stance_table) {
+        const unordered_map<string, Stance> &stance_table,
+        const vector<PostAndResponses> &training_set) {
+    set<int> test_response_ids;
+    for (const auto &v : post_and_responses_vector) {
+        for (int id : v.response_ids) {
+            test_response_ids.insert(id);
+        }
+    }
+
     LookupTable<Param> original_embeddings;
     original_embeddings.init(model_params.lookup_table.elems, hyper_params.word_file);
 
@@ -597,10 +606,39 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         auto stance_group_map = splitResponsesByStance(post_and_responses.post_id, response_ids,
                 stance_table);
 
+        vector<int> ids;
+        for (int i = 0; ids.size() < 64; ++i) {
+            int id = i * 1000000 % response_sentences.size() + loop_i;
+            if (test_response_ids.find(id) == test_response_ids.end()) {
+                ids.push_back(id);
+            }
+        }
+
+        vector<Node *> res_reps;
+        Graph sel_graph;
+        for (int id : ids) {
+            const vector<string> &res = response_sentences.at(id);
+            Node *rep = sentenceRep(sel_graph, res, res_sel_model_params,
+                    res_sel_model_params.response_encoder_params, res_sel_model_params.response_rep_params,
+                    nullptr);
+            res_reps.push_back(rep);
+        }
+        sel_graph.compute();
+
         for (const auto &it : stance_group_map) {
             StanceCategory stance = it.first;
+            Node *post_rep = sentenceRep(sel_graph, post_sentences.at(post_and_responses.post_id),
+                    res_sel_model_params, res_sel_model_params.left_to_right_encoder_params,
+                    res_sel_model_params.post_rep_params, &stance);
+            auto probs = selectionProbs(sel_graph, {post_rep}, res_reps);
+            sel_graph.compute();
+            auto v = probs.front()->val().toCpu();
+            int max_i = max_element(v.begin(), v.end()) - v.begin();
+            int selected_id = ids.at(max_i);
             Graph graph;
             GraphBuilder graph_builder;
+            graph_builder.forwardSel(graph, response_sentences.at(selected_id), hyper_params,
+                    model_params, false);
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params, stance, false);
             vector<DecoderComponents> decoder_components_vector;
@@ -612,6 +650,8 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
             cout << "post:" << endl;
             print(post_sentences.at(post_and_responses.post_id));
             cout << "stance:" << it.first << endl;
+            cout << "selected:" << endl;
+            print(response_sentences.at(selected_id));
             cout << "response:" << endl;
             printWordIds(word_ids_and_probability, model_params.lookup_table);
             cout << "response words:" << endl;
@@ -950,8 +990,9 @@ int main(int argc, const char *argv[]) {
 
     if (default_config.program_mode == ProgramMode::DECODING) {
         hyper_params.beam_size = beam_size;
-        decodeTestPosts(hyper_params, model_params, default_config, test_post_and_responses,
-                post_sentences, response_sentences, all_idf, black_list, stance_table);
+        decodeTestPosts(hyper_params, model_params, res_sel_model_params, default_config,
+                test_post_and_responses, post_sentences, response_sentences, all_idf, black_list,
+                stance_table, train_post_and_responses);
     } else if (default_config.program_mode == ProgramMode::METRIC) {
         path dir_path(default_config.input_model_dir);
         if (!is_directory(dir_path)) {

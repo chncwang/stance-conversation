@@ -395,6 +395,8 @@ struct GraphBuilder {
         vector<string> last_answers;
         bool succeeded = false;
         set<int> searched_word_ids;
+        Node *stance_emb = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
+                static_cast<int>(stance));
 
         for (int iter = 0; ; ++iter) {
             cout << boost::format("forwardDecoderUsingBeamSearch iter:%1%\n") % iter;
@@ -451,10 +453,10 @@ struct GraphBuilder {
                 }
 
                 for (int beam_i = 0; beam_i < beam.size(); ++beam_i) {
-                    DecoderComponents &decoder_components = beam.at(beam_i); // TODO
-//                    forwardDecoderByOneStep(graph, decoder_components, i,
-//                            i == 0 ? nullptr : &last_answers.at(beam_i), hyper_params,
-//                            model_params, stance, false);
+                    DecoderComponents &decoder_components = beam.at(beam_i);
+                    forwardDecoderByOneStep(graph, decoder_components, i,
+                            i == 0 ? nullptr : &last_answers.at(beam_i), hyper_params,
+                            model_params, *stance_emb, false);
                     if (i == 0) {
                         break;
                     }
