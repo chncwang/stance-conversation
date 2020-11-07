@@ -367,6 +367,8 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
     cout << "metricTestPosts begin" << endl;
     hyper_params.print();
     float perplex(0.0f), corpus_hit_sum(0);
+    std::array<float, 3> stance_perplex = {0, 0, 0};
+    std::array<int, 3> stance_size_sum = {0, 0, 0};
     vector<int> corpus_pos_hit_amount, corpus_pos_amount;
     int size_sum = 0;
     globalPoolEnabled() = false;
@@ -402,6 +404,8 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             vector<int> hit_flags;
             float perplex = computePerplex(nodes, word_ids, hit_count, hit_flags, 5);
             sum += perplex;
+            stance_perplex.at(stance_category) += perplex;
+            stance_size_sum.at(stance_category) += word_ids.size();
             hit_sum += hit_count;
             word_sum += word_ids.size();
             for (int i = 0; i < hit_flags.size(); ++i) {
@@ -435,6 +439,11 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
                 corpus_pos_hit_amount.push_back(0);
             }
             corpus_pos_hit_amount.at(i) += post_hit_counts.at(i);
+        }
+
+        for (int i = 0; i < 3; ++i) {
+            cout << boost::format("stance %1% ppl:%2%") % i % exp(stance_perplex.at(i) /
+                    stance_size_sum.at(i)) << endl;
         }
     }
 
@@ -818,19 +827,6 @@ int main(int argc, const char *argv[]) {
         word_counts[unknownkey] = 1000000000;
         alphabet.init(word_counts, hyper_params.word_cutoff);
         cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
-    } else if (default_config.split_unknown_words) {
-        root_ptr = loadModel(default_config.input_model_file);
-        Json::Value &root = *root_ptr;
-        vector<string> words = stringVectorFromJson(
-                root["model_params"]["lookup_table"]["word_ids"]["m_id_to_string"]);
-        unordered_set<string> word_set = knownWords(words);
-        auto &v = default_config.program_mode == ProgramMode::METRIC ? dev_post_and_responses :
-            test_post_and_responses;
-        auto post_ids_and_response_ids = PostAndResponseIds(v);
-        post_sentences = reprocessSentences(post_sentences, word_set,
-                post_ids_and_response_ids.first);
-        response_sentences = reprocessSentences(response_sentences, word_set,
-                post_ids_and_response_ids.second);
     }
 
     ModelParams model_params;
@@ -861,22 +857,20 @@ int main(int argc, const char *argv[]) {
                 hyper_params.hidden_dim + hyper_params.hidden_dim + hyper_params.word_dim, false);
     };
 
-    if (default_config.program_mode != ProgramMode::METRIC) {
-        if (default_config.input_model_file == "") {
-            allocate_model_params(default_config, hyper_params, model_params, &alphabet);
-        } else {
-            root_ptr = loadModel(default_config.input_model_file);
-            loadModel(default_config, hyper_params, model_params, root_ptr.get(),
-                    allocate_model_params);
-            hyper_params.learning_rate_decay = ini_reader.GetFloat("hyper", "learning_rate_decay",
-                    0);
-            hyper_params.min_learning_rate = ini_reader.GetFloat("hyper", "min_learning_rate",
-                    0);
-            hyper_params.learning_rate = ini_reader.GetFloat("hyper", "learning_rate",
-                    0);
-            hyper_params.batch_size = ini_reader.GetFloat("hyper", "batch_size", 1);
-            hyper_params.print();
-        }
+    if (default_config.input_model_file == "") {
+        allocate_model_params(default_config, hyper_params, model_params, &alphabet);
+    } else {
+        root_ptr = loadModel(default_config.input_model_file);
+        loadModel(default_config, hyper_params, model_params, root_ptr.get(),
+                allocate_model_params);
+        hyper_params.learning_rate_decay = ini_reader.GetFloat("hyper", "learning_rate_decay",
+                0);
+        hyper_params.min_learning_rate = ini_reader.GetFloat("hyper", "min_learning_rate",
+                0);
+        hyper_params.learning_rate = ini_reader.GetFloat("hyper", "learning_rate",
+                0);
+        hyper_params.batch_size = ini_reader.GetFloat("hyper", "batch_size", 1);
+        hyper_params.print();
     }
 
     auto black_list = readBlackList(default_config.black_list_file);
@@ -886,45 +880,12 @@ int main(int argc, const char *argv[]) {
         decodeTestPosts(hyper_params, model_params, default_config, test_post_and_responses,
                 post_sentences, response_sentences, all_idf, black_list, stance_table);
     } else if (default_config.program_mode == ProgramMode::METRIC) {
-        path dir_path(default_config.input_model_dir);
-        if (!is_directory(dir_path)) {
-            cerr << format("%1% is not dir path") % default_config.input_model_dir << endl;
-            abort();
-        }
-
-        vector<string> ordered_file_paths;
-        for(auto& entry : boost::make_iterator_range(directory_iterator(dir_path), {})) {
-            string basic_name = entry.path().filename().string();
-            cout << format("basic_name:%1%") % basic_name << endl;
-            if (basic_name.find("model") != 0) {
-                continue;
-            }
-
-            string model_file_path = entry.path().string();
-            ordered_file_paths.push_back(model_file_path);
-        }
-        std::sort(ordered_file_paths.begin(), ordered_file_paths.end(),
-                [](const string &a, const string &b)->bool {
-                using boost::filesystem::last_write_time;
-                return last_write_time(a) < last_write_time(b);
-                });
-
-        float min_perplex = 0.0f;
-        for(const string &model_file_path : ordered_file_paths) {
-            cout << format("model_file_path:%1%") % model_file_path << endl;
-            ModelParams model_params;
-            shared_ptr<Json::Value> root_ptr = loadModel(model_file_path);
-            loadModel(default_config, hyper_params, model_params, root_ptr.get(),
-                    allocate_model_params);
-            float perplex = metricTestPosts(hyper_params, model_params,
-                    dev_post_and_responses, post_sentences, response_sentences, stance_table);
-            cout << format("model %1% perplex is %2%") % model_file_path % perplex << endl;
-            if (min_perplex > perplex) {
-                min_perplex = perplex;
-                cout << format("best model now is %1%, and perplex is %2%") % model_file_path %
-                    perplex << endl;
-            }
-        }
+        float perplex = metricTestPosts(hyper_params, model_params, dev_post_and_responses,
+                post_sentences, response_sentences, stance_table);
+        cout << format("dev perplex is %1%") % perplex << endl;
+        perplex = metricTestPosts(hyper_params, model_params, test_post_and_responses,
+                post_sentences, response_sentences, stance_table);
+        cout << format("test perplex is %1%") % perplex << endl;
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
         ModelUpdate model_update;
         model_update._alpha = hyper_params.learning_rate;
