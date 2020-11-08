@@ -46,7 +46,7 @@ struct DecoderComponents {
             ModelParams &model_params,
             int i) {
         using namespace n3ldg_plus;
-        vector<Node *> concat_inputs = {contexts.at(i), sel_contexts.at(i), decoder._hiddens.at(i),
+        vector<Node *> concat_inputs = {contexts.at(i), decoder._hiddens.at(i),
             i == 0 ? bucket(graph, hyper_params.word_dim, 0) :
                 static_cast<Node*>(decoder_lookups.at(i - 1))};
         Node *concat_node = concat(graph, concat_inputs);

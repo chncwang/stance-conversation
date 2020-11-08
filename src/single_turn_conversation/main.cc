@@ -948,7 +948,7 @@ int main(int argc, const char *argv[]) {
                 hyper_params.word_dim + 2 * hyper_params.hidden_dim + hyper_params.stance_dim);
         model_params.sel_encoder_params.init(hyper_params.hidden_dim, hyper_params.word_dim);
         model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
-                3 * hyper_params.hidden_dim + hyper_params.word_dim,
+                2 * hyper_params.hidden_dim + hyper_params.word_dim,
                 false);
     };
 
