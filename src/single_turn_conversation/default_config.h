@@ -43,6 +43,7 @@ struct DefaultConfig {
     float result_count_factor;
     string human_stance_file;
     string auto_stance_file;
+    int top_k;
 
     void print() const {
         cout << "train_pair_file:" << train_pair_file << endl
@@ -72,7 +73,8 @@ struct DefaultConfig {
             << "memory_in_gb:" << memory_in_gb << endl
             << "human_stance_file:" << human_stance_file << endl
             << "auto_stance_file:" << auto_stance_file << endl
-            << "result_count_factor:" << result_count_factor << endl;
+            << "result_count_factor:" << result_count_factor << endl
+            << "top_k:" << top_k << endl;
     }
 };
 

@@ -139,6 +139,7 @@ DefaultConfig parseDefaultConfig(INIReader &ini_reader) {
 
     default_config.human_stance_file = ini_reader.Get(SECTION, "human_stance_file", "");
     default_config.auto_stance_file = ini_reader.Get(SECTION, "auto_stance_file", "");
+    default_config.top_k = ini_reader.GetInteger(SECTION, "top_k", 0);
 
     return default_config;
 }
@@ -552,9 +553,17 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
                     hyper_params, model_params, stance, false);
             vector<DecoderComponents> decoder_components_vector;
             decoder_components_vector.resize(hyper_params.beam_size);
-            auto pair = graph_builder.forwardDecoderUsingBeamSearch(graph,
-                    decoder_components_vector, hyper_params.beam_size, hyper_params, model_params,
-                    stance, default_config, black_list);
+            pair<vector<WordIdAndProbability>, dtype> pair;
+            cout << "top_k:" << default_config.top_k << endl;
+            if (default_config.top_k <= 0) {
+                pair = graph_builder.forwardDecoderUsingBeamSearch(graph,
+                        decoder_components_vector, hyper_params.beam_size, hyper_params,
+                        model_params, stance, default_config, black_list);
+            } else {
+                pair = graph_builder.forwardDecoderUsingTopKSample(graph,
+                        decoder_components_vector, hyper_params.beam_size, default_config.top_k,
+                        hyper_params, model_params, stance, default_config);
+            }
             const vector<WordIdAndProbability> &word_ids_and_probability = pair.first;
             cout << "post:" << endl;
             print(post_sentences.at(post_and_responses.post_id));
