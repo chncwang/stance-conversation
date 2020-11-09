@@ -35,6 +35,7 @@ struct DefaultConfig {
     int seed;
     int cut_length;
     int max_epoch;
+    int selection_range;
     string output_model_file_prefix;
     string input_model_file;
     string input_model_dir;
@@ -65,6 +66,7 @@ struct DefaultConfig {
             << "seed:" << seed << endl
             << "cut_length:" << cut_length << endl
             << "max_epoch:" << max_epoch << endl
+            << "selection_range:" << selection_range << endl
             << "output_model_file_prefix" << output_model_file_prefix << endl
             << "input_model_file:" << input_model_file << endl
             << "input_model_dir:" << input_model_dir << endl
