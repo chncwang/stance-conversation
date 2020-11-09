@@ -591,6 +591,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
     cout << "decodeTestPosts begin" << endl;
     hyper_params.print();
     array<vector<CandidateAndReferences>, 3> candidate_and_references_vector_arr;
+    vector<CandidateAndReferences> candidate_and_references_vector;
     array<array<float, 4>, 3> cider_sums_arr;
     for (auto &it : cider_sums_arr) {
         it = {0, 0, 0, 0};
@@ -691,22 +692,34 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
 
         CandidateAndReferences candidate_and_references(decoded_word_ids, id_references);
         candidate_and_references_vector_arr.at(stance).push_back(candidate_and_references);
+        candidate_and_references_vector.push_back(candidate_and_references);
 
         for (int ngram = 1; ngram <=4; ++ngram) {
-            float bleu_value = computeBleu(candidate_and_references_vector_arr.at(stance),
-                    ngram);
+            float bleu_value = computeBleu(candidate_and_references_vector, ngram);
             cout << "bleu_" << ngram << ":" << bleu_value << endl;
-            float bleu_mean, bleu_deviation;
-            cout << boost::format("bleu_%1% mean:%2% deviation:%3%") % ngram % bleu_mean %
-                bleu_deviation << endl;
-            float dist_value = computeDist(candidate_and_references_vector_arr.at(stance),
-                    ngram);
+            float dist_value = computeDist(candidate_and_references_vector, ngram);
             cout << "dist_" << ngram << ":" << dist_value << endl;
             float cider = computeCIDEr(candidate_and_references,
                     ngram_idf_tables.at(ngram - 1), ngram);
             cider_sums_arr.at(stance).at(ngram - 1) += cider;
             cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
                 loop_i << endl;
+        }
+        for (int s = 0; s < 3; ++s) {
+            cout << "stance:" << s << endl;
+            for (int ngram = 1; ngram <=4; ++ngram) {
+                float bleu_value = computeBleu(candidate_and_references_vector_arr.at(s),
+                        ngram);
+                cout << "bleu_" << ngram << ":" << bleu_value << endl;
+                float dist_value = computeDist(candidate_and_references_vector_arr.at(s),
+                        ngram);
+                cout << "dist_" << ngram << ":" << dist_value << endl;
+                float cider = computeCIDEr(candidate_and_references,
+                        ngram_idf_tables.at(ngram - 1), ngram);
+                cider_sums_arr.at(stance).at(ngram - 1) += cider;
+                cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
+                    loop_i << endl;
+            }
         }
         float greedy_matching_sim = computeGreedyMatching(candidate_and_references,
                 original_embeddings);
