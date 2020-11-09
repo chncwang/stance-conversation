@@ -552,6 +552,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         ResSelModelParams &res_sel_model_params,
         DefaultConfig &default_config,
         const vector<PostAndResponses> &post_and_responses_vector,
+        const vector<StanceCategory> &stances,
         const vector<vector<string>> &post_sentences,
         const vector<vector<string>> &response_sentences,
         const unordered_map<string, float> &all_idf,
@@ -625,105 +626,109 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         }
         sel_graph.compute();
 
-        for (const auto &it : stance_group_map) {
-            StanceCategory stance = it.first;
-            Node *post_rep = sentenceRep(sel_graph, post_sentences.at(post_and_responses.post_id),
-                    res_sel_model_params, res_sel_model_params.left_to_right_encoder_params,
-                    res_sel_model_params.post_rep_params, &stance);
-            auto probs = selectionProbs(sel_graph, {post_rep}, res_reps);
-            sel_graph.compute();
-            auto v = probs.front()->val().toCpu();
-            int max_i = max_element(v.begin(), v.end()) - v.begin();
-            int selected_id = ids.at(max_i);
-            Graph graph;
-            GraphBuilder graph_builder;
-            graph_builder.forwardSel(graph, response_sentences.at(selected_id), hyper_params,
-                    model_params, false);
-            graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
-                    hyper_params, model_params, stance, false);
-            vector<DecoderComponents> decoder_components_vector;
-            decoder_components_vector.resize(hyper_params.beam_size);
-            auto pair = graph_builder.forwardDecoderUsingBeamSearch(graph,
-                    decoder_components_vector, hyper_params.beam_size, hyper_params, model_params,
-                    stance, default_config, black_list);
-            const vector<WordIdAndProbability> &word_ids_and_probability = pair.first;
-            cout << "post:" << endl;
-            print(post_sentences.at(post_and_responses.post_id));
-            cout << "stance:" << it.first << endl;
-            cout << "selected:" << endl;
-            print(response_sentences.at(selected_id));
-            cout << "response:" << endl;
-            printWordIds(word_ids_and_probability, model_params.lookup_table);
-            cout << "response words:" << endl;
-            printWordIds(word_ids_and_probability, model_params.lookup_table, true);
-
-            dtype probability = pair.second;
-            cout << format("probability:%1%") % probability << endl;
-            if (word_ids_and_probability.empty()) {
-                cerr << "empty result" << endl;
-                abort();
-            }
-
-            vector<string> decoded_word_ids;
-            auto to_str = [&](const WordIdAndProbability &in) ->string {
-                return model_params.lookup_table.elems.from_id(in.word_id);
-            };
-            transform(word_ids_and_probability.begin(), word_ids_and_probability.end(),
-                    back_inserter(decoded_word_ids), to_str);
-            decoded_word_ids.pop_back();
-            vector<vector<string>> str_references =
-                transferVector<vector<string>, int>(it.second,
-                        [&](int response_id) -> vector<string> {
-                        return response_sentences.at(response_id);
-                        });
-            vector<vector<string>> id_references;
-            for (const vector<string> &strs : str_references) {
-                auto stop_removed = strs;
-                stop_removed.pop_back();
-                id_references.push_back(stop_removed);
-            }
-
-            CandidateAndReferences candidate_and_references(decoded_word_ids, id_references);
-            candidate_and_references_vector_arr.at(stance).push_back(candidate_and_references);
-
-            for (int ngram = 1; ngram <=4; ++ngram) {
-                float bleu_value = computeBleu(candidate_and_references_vector_arr.at(stance),
-                        ngram);
-                cout << "bleu_" << ngram << ":" << bleu_value << endl;
-                float bleu_mean, bleu_deviation;
-                cout << boost::format("bleu_%1% mean:%2% deviation:%3%") % ngram % bleu_mean %
-                    bleu_deviation << endl;
-                float dist_value = computeDist(candidate_and_references_vector_arr.at(stance),
-                        ngram);
-                cout << "dist_" << ngram << ":" << dist_value << endl;
-                float cider = computeCIDEr(candidate_and_references,
-                        ngram_idf_tables.at(ngram - 1), ngram);
-                cider_sums_arr.at(stance).at(ngram - 1) += cider;
-                cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
-                    loop_i << endl;
-            }
-            float greedy_matching_sim = computeGreedyMatching(candidate_and_references,
-                    original_embeddings);
-            greedy_matching_similarities.at(stance).push_back(greedy_matching_sim);
-            float greedy_matching_sim_mean, greedy_matching_sim_sd;
-            computeMeanAndStandardDeviation(greedy_matching_similarities.at(stance),
-                    greedy_matching_sim_mean, greedy_matching_sim_sd);
-            cout << boost::format("greedy matching mean:%1% standard_deviation:%2%") %
-                greedy_matching_sim_mean % greedy_matching_sim_sd << endl;
-            float avg_sim = computeEmbeddingAvg(candidate_and_references, original_embeddings);
-            avg_matching_similarities.at(stance).push_back(avg_sim);
-            float avg_matching_sim_mean, avg_matching_sim_sd;
-            computeMeanAndStandardDeviation(avg_matching_similarities.at(stance),
-                    avg_matching_sim_mean, avg_matching_sim_sd);
-            cout << boost::format("embedding average mean:%1% standard_deviation:%2%") %
-                avg_matching_sim_mean % avg_matching_sim_sd << endl;
-            float extrema = computeExtrema(candidate_and_references, original_embeddings);
-            extrema_similarities.at(stance).push_back(extrema);
-            float extrema_mean, extrema_sd;
-            computeMeanAndStandardDeviation(extrema_similarities.at(stance), extrema_mean, extrema_sd);
-            cout << boost::format("extrema mean:%1% standard_deviation:%2%") % extrema_mean %
-                extrema_sd << endl;
+        StanceCategory stance = stances.at(loop_i - 1);
+        auto it = stance_group_map.find(stance);
+        if (it == stance_group_map.end()) {
+            cout << "no corresponding refs" << endl;
+            continue;
         }
+
+        Node *post_rep = sentenceRep(sel_graph, post_sentences.at(post_and_responses.post_id),
+                res_sel_model_params, res_sel_model_params.left_to_right_encoder_params,
+                res_sel_model_params.post_rep_params, &stance);
+        auto probs = selectionProbs(sel_graph, {post_rep}, res_reps);
+        sel_graph.compute();
+        auto v = probs.front()->val().toCpu();
+        int max_i = max_element(v.begin(), v.end()) - v.begin();
+        int selected_id = ids.at(max_i);
+        Graph graph;
+        GraphBuilder graph_builder;
+        graph_builder.forwardSel(graph, response_sentences.at(selected_id), hyper_params,
+                model_params, false);
+        graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
+                hyper_params, model_params, stance, false);
+        vector<DecoderComponents> decoder_components_vector;
+        decoder_components_vector.resize(hyper_params.beam_size);
+        auto pair = graph_builder.forwardDecoderUsingBeamSearch(graph,
+                decoder_components_vector, hyper_params.beam_size, hyper_params, model_params,
+                stance, default_config, black_list);
+        const vector<WordIdAndProbability> &word_ids_and_probability = pair.first;
+        cout << "post:" << endl;
+        print(post_sentences.at(post_and_responses.post_id));
+        cout << "stance:" << stance << endl;
+        cout << "selected:" << endl;
+        print(response_sentences.at(selected_id));
+        cout << "response:" << endl;
+        printWordIds(word_ids_and_probability, model_params.lookup_table);
+        cout << "response words:" << endl;
+        printWordIds(word_ids_and_probability, model_params.lookup_table, true);
+
+        dtype probability = pair.second;
+        cout << format("probability:%1%") % probability << endl;
+        if (word_ids_and_probability.empty()) {
+            cerr << "empty result" << endl;
+            abort();
+        }
+
+        vector<string> decoded_word_ids;
+        auto to_str = [&](const WordIdAndProbability &in) ->string {
+            return model_params.lookup_table.elems.from_id(in.word_id);
+        };
+        transform(word_ids_and_probability.begin(), word_ids_and_probability.end(),
+                back_inserter(decoded_word_ids), to_str);
+        decoded_word_ids.pop_back();
+        vector<vector<string>> str_references =
+            transferVector<vector<string>, int>(it->second,
+                    [&](int response_id) -> vector<string> {
+                    return response_sentences.at(response_id);
+                    });
+        vector<vector<string>> id_references;
+        for (const vector<string> &strs : str_references) {
+            auto stop_removed = strs;
+            stop_removed.pop_back();
+            id_references.push_back(stop_removed);
+        }
+
+        CandidateAndReferences candidate_and_references(decoded_word_ids, id_references);
+        candidate_and_references_vector_arr.at(stance).push_back(candidate_and_references);
+
+        for (int ngram = 1; ngram <=4; ++ngram) {
+            float bleu_value = computeBleu(candidate_and_references_vector_arr.at(stance),
+                    ngram);
+            cout << "bleu_" << ngram << ":" << bleu_value << endl;
+            float bleu_mean, bleu_deviation;
+            cout << boost::format("bleu_%1% mean:%2% deviation:%3%") % ngram % bleu_mean %
+                bleu_deviation << endl;
+            float dist_value = computeDist(candidate_and_references_vector_arr.at(stance),
+                    ngram);
+            cout << "dist_" << ngram << ":" << dist_value << endl;
+            float cider = computeCIDEr(candidate_and_references,
+                    ngram_idf_tables.at(ngram - 1), ngram);
+            cider_sums_arr.at(stance).at(ngram - 1) += cider;
+            cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
+                loop_i << endl;
+        }
+        float greedy_matching_sim = computeGreedyMatching(candidate_and_references,
+                original_embeddings);
+        greedy_matching_similarities.at(stance).push_back(greedy_matching_sim);
+        float greedy_matching_sim_mean, greedy_matching_sim_sd;
+        computeMeanAndStandardDeviation(greedy_matching_similarities.at(stance),
+                greedy_matching_sim_mean, greedy_matching_sim_sd);
+        cout << boost::format("greedy matching mean:%1% standard_deviation:%2%") %
+            greedy_matching_sim_mean % greedy_matching_sim_sd << endl;
+        float avg_sim = computeEmbeddingAvg(candidate_and_references, original_embeddings);
+        avg_matching_similarities.at(stance).push_back(avg_sim);
+        float avg_matching_sim_mean, avg_matching_sim_sd;
+        computeMeanAndStandardDeviation(avg_matching_similarities.at(stance),
+                avg_matching_sim_mean, avg_matching_sim_sd);
+        cout << boost::format("embedding average mean:%1% standard_deviation:%2%") %
+            avg_matching_sim_mean % avg_matching_sim_sd << endl;
+        float extrema = computeExtrema(candidate_and_references, original_embeddings);
+        extrema_similarities.at(stance).push_back(extrema);
+        float extrema_mean, extrema_sd;
+        computeMeanAndStandardDeviation(extrema_similarities.at(stance), extrema_mean, extrema_sd);
+        cout << boost::format("extrema mean:%1% standard_deviation:%2%") % extrema_mean %
+            extrema_sd << endl;
     }
 }
 
@@ -990,9 +995,18 @@ int main(int argc, const char *argv[]) {
 
     if (default_config.program_mode == ProgramMode::DECODING) {
         hyper_params.beam_size = beam_size;
+
+        vector<StanceCategory> ids;
+
+        std::ifstream is("/var/wqs/annotated-stances");
+        std::string line;
+        while(std::getline(is, line)) {
+            ids.push_back((StanceCategory)std::stoi(line));
+        }
+
         decodeTestPosts(hyper_params, model_params, res_sel_model_params, default_config,
-                test_post_and_responses, post_sentences, response_sentences, all_idf, black_list,
-                stance_table, train_post_and_responses);
+                test_post_and_responses, ids, post_sentences, response_sentences, all_idf,
+                black_list, stance_table, train_post_and_responses);
     } else if (default_config.program_mode == ProgramMode::METRIC) {
         path dir_path(default_config.input_model_dir);
         if (!is_directory(dir_path)) {
