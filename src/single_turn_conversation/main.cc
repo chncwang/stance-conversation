@@ -130,6 +130,7 @@ DefaultConfig parseDefaultConfig(INIReader &ini_reader) {
     default_config.seed = ini_reader.GetInteger(SECTION, "seed", 0);
     default_config.cut_length = ini_reader.GetInteger(SECTION, "cut_length", 30);
     default_config.max_epoch = ini_reader.GetInteger(SECTION, "max_epoch", 100);
+    default_config.selection_range = ini_reader.GetInteger(SECTION, "selection_range", 100);
     default_config.output_model_file_prefix = ini_reader.Get(SECTION, "output_model_file_prefix",
             "");
     default_config.input_model_file = ini_reader.Get(SECTION, "input_model_file", "");
@@ -609,7 +610,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
                 stance_table);
 
         vector<int> ids;
-        for (int i = 0; ids.size() < 1000; ++i) {
+        for (int i = 0; ids.size() < default_config.selection_range; ++i) {
             int id = (i * 1000000 + loop_i) % response_sentences.size();
             if (test_response_ids.find(id) == test_response_ids.end()) {
                 ids.push_back(id);
