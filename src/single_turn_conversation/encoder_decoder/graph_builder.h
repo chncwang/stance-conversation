@@ -589,11 +589,12 @@ struct GraphBuilder {
                     break;
                 }
 
+                Node *emb = n3ldg_plus::embedding(graph, model_params.stance_embeddings, stance);
                 for (int beam_i = 0; beam_i < beam.size(); ++beam_i) {
                     DecoderComponents &decoder_components = beam.at(beam_i);
                     forwardDecoderByOneStep(graph, decoder_components, i,
                             i == 0 ? nullptr : &last_answers.at(beam_i), hyper_params,
-                            model_params, stance, false);
+                            model_params, *emb, false);
                     if (i == 0) {
                         break;
                     }
