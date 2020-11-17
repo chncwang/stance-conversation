@@ -555,6 +555,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         DefaultConfig &default_config,
         const vector<PostAndResponses> &post_and_responses_vector,
         const vector<StanceCategory> &stances,
+        const vector<vector<string>> &incepted_refs,
         const vector<vector<string>> &post_sentences,
         const vector<vector<string>> &response_sentences,
         const unordered_map<string, float> &all_idf,
@@ -610,148 +611,81 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         auto stance_group_map = splitResponsesByStance(post_and_responses.post_id, response_ids,
                 stance_table);
 
-        vector<int> ids;
-        for (int i = 0; ids.size() < default_config.selection_range; ++i) {
-            int id = (i * 1000000 + loop_i) % response_sentences.size();
-            if (test_response_ids.find(id) == test_response_ids.end()) {
-                ids.push_back(id);
-            }
-        }
-
-        vector<Node *> res_reps;
-        Graph sel_graph;
-        for (int id : ids) {
-            const vector<string> &res = response_sentences.at(id);
-            Node *rep = sentenceRep(sel_graph, res, res_sel_model_params,
-                    res_sel_model_params.response_encoder_params, res_sel_model_params.response_rep_params,
-                    nullptr);
+        for (const auto &incepted_ref : incepted_refs) {
+            vector<Node *> res_reps;
+            Graph sel_graph;
+            Node *rep = sentenceRep(sel_graph, incepted_ref, res_sel_model_params,
+                    res_sel_model_params.response_encoder_params,
+                    res_sel_model_params.response_rep_params, nullptr);
             res_reps.push_back(rep);
-        }
-        sel_graph.compute();
+            sel_graph.compute();
 
-        StanceCategory stance = stances.at(loop_i - 1);
-        auto it = stance_group_map.find(stance);
-        if (it == stance_group_map.end()) {
-            cout << "no corresponding refs" << endl;
-            continue;
-        }
+            StanceCategory stance = stances.at(loop_i - 1);
+            auto it = stance_group_map.find(stance);
+            if (it == stance_group_map.end()) {
+                cout << "no corresponding refs" << endl;
+                continue;
+            }
 
-        Node *post_rep = sentenceRep(sel_graph, post_sentences.at(post_and_responses.post_id),
-                res_sel_model_params, res_sel_model_params.left_to_right_encoder_params,
-                res_sel_model_params.post_rep_params, &stance);
-        auto probs = selectionProbs(sel_graph, {post_rep}, res_reps);
-        sel_graph.compute();
-        auto v = probs.front()->val().toCpu();
-        int max_i = max_element(v.begin(), v.end()) - v.begin();
-        int selected_id = ids.at(max_i);
-        Graph graph;
-        GraphBuilder graph_builder;
-        graph_builder.forwardSel(graph, response_sentences.at(selected_id), hyper_params,
-                model_params, false);
-        graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
-                hyper_params, model_params, stance, false);
-        vector<DecoderComponents> decoder_components_vector;
-        decoder_components_vector.resize(hyper_params.beam_size);
-        pair<vector<WordIdAndProbability>, dtype> pair;
-        int top_k = default_config.top_k;
-        if (top_k < 0) {
-            pair = graph_builder.forwardDecoderUsingBeamSearch(graph, decoder_components_vector,
-                    hyper_params.beam_size, hyper_params, model_params, stance, default_config,
-                    black_list);
-        } else {
-            pair = graph_builder.forwardDecoderUsingTopKSample(graph, decoder_components_vector,
-                    hyper_params.beam_size, default_config.top_k, hyper_params, model_params,
-                    stance, default_config);
-        }
-        const vector<WordIdAndProbability> &word_ids_and_probability = pair.first;
-        cout << "post:" << endl;
-        print(post_sentences.at(post_and_responses.post_id));
-        cout << "stance:" << stance << endl;
-        cout << "selected:" << endl;
-        print(response_sentences.at(selected_id));
-        cout << "response:" << endl;
-        printWordIds(word_ids_and_probability, model_params.lookup_table);
-        cout << "response words:" << endl;
-        printWordIds(word_ids_and_probability, model_params.lookup_table, true);
+            dtype max_score = -1e10;
+            int favored_s;
+            for (int s= 0; s < 3; ++s) {
+                Node *post_rep = sentenceRep(sel_graph,
+                        post_sentences.at(post_and_responses.post_id),
+                        res_sel_model_params, res_sel_model_params.left_to_right_encoder_params,
+                        res_sel_model_params.post_rep_params, (StanceCategory*)&s);
+                Node *x = n3ldg_plus::pointwiseMultiply(sel_graph, *post_rep, *rep);
+                Node *score_node = n3ldg_plus::vectorSum(sel_graph, *x);
+                sel_graph.compute();
+                dtype score = score_node->getVal().toCpu()[0];
+                if (score > max_score) {
+                    max_score = score;
+                    favored_s = s;
+                }
+                cout << boost::format("stance:%1% %2%") % s % score << endl;
+            }
+            cout << boost::format("favored stance:%1% %2%") % favored_s % max_score << endl;
+            if (max_score < 150) {
+                continue;
+            }
+            Graph graph;
+            GraphBuilder graph_builder;
+            graph_builder.forwardSel(graph, incepted_ref, hyper_params,
+                    model_params, false);
+            graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
+                    hyper_params, model_params, (StanceCategory)favored_s, false);
+            vector<DecoderComponents> decoder_components_vector;
+            decoder_components_vector.resize(hyper_params.beam_size);
+            pair<vector<WordIdAndProbability>, dtype> pair;
+            int top_k = default_config.top_k;
+            if (top_k < 0) {
+                pair = graph_builder.forwardDecoderUsingBeamSearch(graph, decoder_components_vector,
+                        hyper_params.beam_size, hyper_params, model_params,
+                        (StanceCategory)(favored_s), default_config,
+                        black_list);
+            } else {
+                pair = graph_builder.forwardDecoderUsingTopKSample(graph, decoder_components_vector,
+                        hyper_params.beam_size, default_config.top_k, hyper_params, model_params,
+                        (StanceCategory)favored_s, default_config);
+            }
+            const vector<WordIdAndProbability> &word_ids_and_probability = pair.first;
+            cout << "post:" << endl;
+            print(post_sentences.at(post_and_responses.post_id));
+            cout << "stance:" << stance << endl;
+            cout << "incepted:" << endl;
+            print(incepted_ref);
+            cout << "response:" << endl;
+            printWordIds(word_ids_and_probability, model_params.lookup_table);
+            cout << "response words:" << endl;
+            printWordIds(word_ids_and_probability, model_params.lookup_table, true);
 
-        dtype probability = pair.second;
-        cout << format("probability:%1%") % probability << endl;
-        if (word_ids_and_probability.empty()) {
-            cerr << "empty result" << endl;
-            abort();
-        }
-
-        vector<string> decoded_word_ids;
-        auto to_str = [&](const WordIdAndProbability &in) ->string {
-            return model_params.lookup_table.elems.from_id(in.word_id);
-        };
-        transform(word_ids_and_probability.begin(), word_ids_and_probability.end(),
-                back_inserter(decoded_word_ids), to_str);
-        decoded_word_ids.pop_back();
-        vector<vector<string>> str_references =
-            transferVector<vector<string>, int>(it->second,
-                    [&](int response_id) -> vector<string> {
-                    return response_sentences.at(response_id);
-                    });
-        vector<vector<string>> id_references;
-        for (const vector<string> &strs : str_references) {
-            auto stop_removed = strs;
-            stop_removed.pop_back();
-            id_references.push_back(stop_removed);
-        }
-
-        CandidateAndReferences candidate_and_references(decoded_word_ids, id_references);
-        candidate_and_references_vector_arr.at(stance).push_back(candidate_and_references);
-        candidate_and_references_vector.push_back(candidate_and_references);
-
-        for (int ngram = 1; ngram <=4; ++ngram) {
-            float bleu_value = computeBleu(candidate_and_references_vector, ngram);
-            cout << "bleu_" << ngram << ":" << bleu_value << endl;
-            float dist_value = computeDist(candidate_and_references_vector, ngram);
-            cout << "dist_" << ngram << ":" << dist_value << endl;
-            float cider = computeCIDEr(candidate_and_references,
-                    ngram_idf_tables.at(ngram - 1), ngram);
-            cider_sums_arr.at(stance).at(ngram - 1) += cider;
-            cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
-                loop_i << endl;
-        }
-        for (int s = 0; s < 3; ++s) {
-            cout << "stance:" << s << endl;
-            for (int ngram = 1; ngram <=4; ++ngram) {
-                float bleu_value = computeBleu(candidate_and_references_vector_arr.at(s),
-                        ngram);
-                cout << "bleu_" << ngram << ":" << bleu_value << endl;
-                float dist_value = computeDist(candidate_and_references_vector_arr.at(s),
-                        ngram);
-                cout << "dist_" << ngram << ":" << dist_value << endl;
-                float cider = computeCIDEr(candidate_and_references,
-                        ngram_idf_tables.at(ngram - 1), ngram);
-                cider_sums_arr.at(stance).at(ngram - 1) += cider;
-                cout << "cider_" << ngram << ":" << cider_sums_arr.at(stance).at(ngram - 1) /
-                    loop_i << endl;
+            dtype probability = pair.second;
+            cout << format("probability:%1%") % probability << endl;
+            if (word_ids_and_probability.empty()) {
+                cerr << "empty result" << endl;
+                abort();
             }
         }
-        float greedy_matching_sim = computeGreedyMatching(candidate_and_references,
-                original_embeddings);
-        greedy_matching_similarities.at(stance).push_back(greedy_matching_sim);
-        float greedy_matching_sim_mean, greedy_matching_sim_sd;
-        computeMeanAndStandardDeviation(greedy_matching_similarities.at(stance),
-                greedy_matching_sim_mean, greedy_matching_sim_sd);
-        cout << boost::format("greedy matching mean:%1% standard_deviation:%2%") %
-            greedy_matching_sim_mean % greedy_matching_sim_sd << endl;
-        float avg_sim = computeEmbeddingAvg(candidate_and_references, original_embeddings);
-        avg_matching_similarities.at(stance).push_back(avg_sim);
-        float avg_matching_sim_mean, avg_matching_sim_sd;
-        computeMeanAndStandardDeviation(avg_matching_similarities.at(stance),
-                avg_matching_sim_mean, avg_matching_sim_sd);
-        cout << boost::format("embedding average mean:%1% standard_deviation:%2%") %
-            avg_matching_sim_mean % avg_matching_sim_sd << endl;
-        float extrema = computeExtrema(candidate_and_references, original_embeddings);
-        extrema_similarities.at(stance).push_back(extrema);
-        float extrema_mean, extrema_sd;
-        computeMeanAndStandardDeviation(extrema_similarities.at(stance), extrema_mean, extrema_sd);
-        cout << boost::format("extrema mean:%1% standard_deviation:%2%") % extrema_mean %
-            extrema_sd << endl;
     }
 }
 
@@ -1020,16 +954,25 @@ int main(int argc, const char *argv[]) {
         hyper_params.beam_size = beam_size;
 
         vector<StanceCategory> ids;
-
         std::ifstream is("/var/wqs/annotated-stances");
         std::string line;
         while(std::getline(is, line)) {
             ids.push_back((StanceCategory)std::stoi(line));
         }
 
+        vector<vector<string>> incepted_refs;
+        std::ifstream is2("/var/wqs/inception");
+        std::string line2;
+        while(std::getline(is2, line2)) {
+            vector<std::string> incepted_words;
+            boost::split(incepted_words, line2, is_any_of(" "));
+            cout << "before decoding" << endl;
+            print(incepted_words);
+            incepted_refs.push_back(incepted_words);
+        }
         decodeTestPosts(hyper_params, model_params, res_sel_model_params, default_config,
-                test_post_and_responses, ids, post_sentences, response_sentences, all_idf,
-                black_list, stance_table, train_post_and_responses);
+                test_post_and_responses, ids, incepted_refs, post_sentences, response_sentences,
+                all_idf, black_list, stance_table, train_post_and_responses);
     } else if (default_config.program_mode == ProgramMode::METRIC) {
         path dir_path(default_config.input_model_dir);
         if (!is_directory(dir_path)) {
