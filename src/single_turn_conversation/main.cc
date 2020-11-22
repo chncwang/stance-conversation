@@ -778,14 +778,39 @@ int main(int argc, const char *argv[]) {
     auto stance_table = readStanceTable(default_config.human_stance_file,
             default_config.auto_stance_file);
 
-    vector<ConversationPair> train_conversation_pairs;
-    for (const PostAndResponses &post_and_responses : train_post_and_responses) {
-        vector<ConversationPair> conversation_pairs = toConversationPairs(post_and_responses,
-                stance_table);
-        for (ConversationPair &conversation_pair : conversation_pairs) {
-            train_conversation_pairs.push_back(move(conversation_pair));
+    auto toPairs = [&] (const vector<PostAndResponses> &in) {
+        cout << "toPairs input size:" << in.size() << endl;
+        vector<ConversationPair> pairs;
+        for (const PostAndResponses &post_and_responses : in) {
+            vector<ConversationPair> p = toConversationPairs(post_and_responses,
+                    stance_table);
+            for (ConversationPair &conversation_pair : p) {
+                pairs.push_back(move(conversation_pair));
+            }
         }
+        return pairs;
+    };
+
+    vector<ConversationPair> train_conversation_pairs = toPairs(train_post_and_responses);
+    vector<ConversationPair> dev_conversation_pairs = toPairs(dev_post_and_responses);
+    vector<ConversationPair> test_conversation_pairs = toPairs(test_post_and_responses);
+
+    for (const auto e : {&train_conversation_pairs, &dev_conversation_pairs,
+            &test_conversation_pairs}) {
+        cout << "total size:" << e->size() << endl;
+        std::array<int, 3> counts = {0, 0, 0};
+        for (const auto &p : *e) {
+            int s = max_element(p.stance.begin(), p.stance.end()) - p.stance.begin();
+            counts.at(s)++;
+        }
+
+        for (int x : counts) {
+            cout << x << " ";
+        }
+        cout << endl;
     }
+
+    exit(0);
 
     cout << "train size:" << train_conversation_pairs.size() << " dev size:" <<
         dev_post_and_responses.size() << " test size:" << test_post_and_responses.size() << endl;
