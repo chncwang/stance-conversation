@@ -454,11 +454,8 @@ struct GraphBuilder {
         }
 
         for (Node* node : encoder_lookups) {
-            Node *embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
-                    static_cast<int>(stance_category));
-            Node *concated = n3ldg_plus::concat(graph, {node, embedding});
             left_to_right_encoder.forward(graph, model_params.left_to_right_encoder_params,
-                    *concated, *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
+                    *node, *hidden_bucket, *hidden_bucket, hyper_params.dropout, is_training);
         }
     }
 
@@ -490,10 +487,6 @@ struct GraphBuilder {
         } else {
             last_input = bucket(graph, hyper_params.word_dim, 0);
         }
-
-        Node *stance_embedding = n3ldg_plus::embedding(graph, model_params.stance_embeddings,
-                static_cast<int>(stance));
-        last_input = n3ldg_plus::concat(graph, {last_input, stance_embedding});
 
         decoder_components.forward(graph, hyper_params, model_params, *last_input,
                 left_to_right_encoder._hiddens, is_training);

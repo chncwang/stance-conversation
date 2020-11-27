@@ -12,13 +12,12 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 #endif
 {
     LookupTable<Param> lookup_table;
-    Param stance_embeddings;
     UniParams hidden_to_wordvector_params;
     LSTM1Params left_to_right_encoder_params;
     LSTM1Params left_to_right_decoder_params;
     AdditiveAttentionParams attention_params;
 
-    ModelParams() : lookup_table("lookup_table"), stance_embeddings("stance_embeddings"),
+    ModelParams() : lookup_table("lookup_table"),
     hidden_to_wordvector_params("hidden_to_wordvector_params"),
     left_to_right_encoder_params("encoder"), left_to_right_decoder_params("decoder"),
     attention_params("attention_params") {}
@@ -26,7 +25,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     Json::Value toJson() const override {
         Json::Value json;
         json["lookup_table"] = lookup_table.toJson();
-        json["stance_embeddings"] = stance_embeddings.toJson();
         json["hidden_to_wordvector_params"] = hidden_to_wordvector_params.toJson();
         json["left_to_right_encoder_params"] = left_to_right_encoder_params.toJson();
         json["left_to_right_decoder_params"] = left_to_right_decoder_params.toJson();
@@ -36,7 +34,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 
     void fromJson(const Json::Value &json) override {
         lookup_table.fromJson(json["lookup_table"]);
-        stance_embeddings.fromJson(json["stance_embeddings"]);
         hidden_to_wordvector_params.fromJson(json["hidden_to_wordvector_params"]);
         left_to_right_encoder_params.fromJson(json["left_to_right_encoder_params"]);
         left_to_right_decoder_params.fromJson(json["left_to_right_decoder_params"]);
@@ -52,7 +49,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&lookup_table, &stance_embeddings, &hidden_to_wordvector_params,
+        return {&lookup_table, &hidden_to_wordvector_params,
             &left_to_right_encoder_params, &left_to_right_decoder_params, &attention_params};
     }
 };
