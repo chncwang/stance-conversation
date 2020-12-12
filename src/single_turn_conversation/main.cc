@@ -795,6 +795,7 @@ int main(int argc, const char *argv[]) {
     vector<ConversationPair> dev_conversation_pairs = toPairs(dev_post_and_responses);
     vector<ConversationPair> test_conversation_pairs = toPairs(test_post_and_responses);
 
+    std::array<int, 3> total_counts = {0, 0, 0};
     for (const auto e : {&train_conversation_pairs, &dev_conversation_pairs,
             &test_conversation_pairs}) {
         cout << "total size:" << e->size() << endl;
@@ -808,15 +809,64 @@ int main(int argc, const char *argv[]) {
             cout << x << " ";
         }
         cout << endl;
+        total_counts.at(0) += counts.at(0);
+        total_counts.at(1) += counts.at(1);
+        total_counts.at(2) += counts.at(2);
     }
-
-    exit(0);
 
     cout << "train size:" << train_conversation_pairs.size() << " dev size:" <<
         dev_post_and_responses.size() << " test size:" << test_post_and_responses.size() << endl;
 
     vector<vector<string>> post_sentences = readSentences(default_config.post_file);
     vector<vector<string>> response_sentences = readSentences(default_config.response_file);
+    float len_sum = 0;
+    float var_sum = 0;
+    for (const auto &e : post_sentences) {
+        len_sum += e.size();
+    }
+    float len_mean = len_sum / post_sentences.size();
+    for (const auto &e : post_sentences) {
+        var_sum += pow((e.size() - len_mean), 2);
+    }
+    float sd = sqrt(var_sum / (post_sentences.size() - 1));
+    cout << boost::format("post len mean:%1% sd:%2%") % len_mean % sd << endl;
+    std::array<float, 3> len_sums = {0, 0, 0};
+    std::array<float, 3> var_sums = {0, 0, 0};
+    len_sum = 0;
+    var_sum = 0;
+    for (const auto &e : {&train_conversation_pairs, &dev_conversation_pairs,
+            &test_conversation_pairs}) {
+        for (const auto &p : *e) {
+            int s = max_element(p.stance.begin(), p.stance.end()) - p.stance.begin();
+            len_sums.at(s) += response_sentences.at(p.response_id).size();
+            len_sum += response_sentences.at(p.response_id).size();
+        }
+    }
+    std::array<float, 3> len_means;
+    for (int i = 0; i < 3; ++i) {
+        len_means.at(i) = len_sums.at(i) / total_counts.at(i);
+    }
+    int total_count = total_counts.at(0) + total_counts.at(1) + total_counts.at(2);
+    len_mean = len_sum / (total_count);
+    for (const auto &e : {&train_conversation_pairs, &dev_conversation_pairs,
+            &test_conversation_pairs}) {
+        for (const auto &p : *e) {
+            int s = max_element(p.stance.begin(), p.stance.end()) - p.stance.begin();
+            int x = response_sentences.at(p.response_id).size();
+            var_sums.at(s) += pow(x - len_means.at(s), 2);
+            var_sum += pow(x - len_means.at(s), 2);
+        }
+    }
+    std::array<float, 3> sds;
+    for (int i = 0; i < 3; ++i) {
+        sds.at(i) = sqrt(var_sums.at(i) / (total_counts.at(i) - 1));
+        cout << boost::format("stance:%1% mean:%2% sd:%3%") % i % len_means.at(i) % sds.at(i) <<
+            endl;
+    }
+    dtype std = sqrt(var_sum / (total_count - 1));
+    cout << len_mean << std << endl;
+    exit(0);
+
 
     vector<vector<string>> all_sentences;
     for (auto &p : train_conversation_pairs) {
