@@ -80,8 +80,7 @@ public:
     BeamSearchResult(Graph &graph, TransformerDecoderParams &params,
             const vector<Node *> &encoder_hiddens,
             dtype dropout,
-            bool is_training) : decoder_components_(graph, params, encoder_hiddens, dropout,
-                is_training) {
+            bool is_training) {
         ngram_counts_ = {0, 0, 0};
     }
     BeamSearchResult(const BeamSearchResult &beam_search_result) = default;
@@ -323,24 +322,21 @@ struct GraphBuilder {
             const HyperParams &hyper_params,
             ModelParams &model_params,
             bool is_training) {
-        decoder_components.decoder.prepare();
         using namespace n3ldg_plus;
-        vector<Node *> inputs;
         for (int i = 0; i < answer.size(); ++i) {
             Node *last_input;
             if (i > 0) {
-                Node *decoder_lookup = embedding(graph, model_params.lookup_table,
-                        answer.at(i - 1));
-                decoder_components.decoder_lookups.push_back(decoder_lookup);
-                last_input = decoder_components.decoder_lookups.at(i - 1);
+                last_input = embedding(graph, model_params.lookup_table, answer.at(i - 1));
             } else {
-//                last_input = bucket(graph, hyper_params.word_dim, 0);
                 last_input = embedding(graph, model_params.begin_emb, 0);
             }
-            inputs.push_back(last_input);
-        }
+            last_input = dropout(graph, *last_input, hyper_params.dropout, is_training);
+            decoder_components.decoder_lookups.push_back(last_input);
 
-        decoder_components.forward(inputs);
+            decoder_components.forward(graph, hyper_params, model_params,
+                    *decoder_components.decoder_lookups.back(),
+                    encoder_hiddens, is_training);
+        }
 
         for (int i = 0; i < answer.size(); ++i) {
             Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,

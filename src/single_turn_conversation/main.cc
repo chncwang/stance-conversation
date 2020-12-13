@@ -371,9 +371,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             GraphBuilder graph_builder;
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params, false);
-            DecoderComponents decoder_components(graph,
-                    model_params.left_to_right_decoder_params, graph_builder.encoder_hiddens,
-                    hyper_params.dropout, false);
+            DecoderComponents decoder_components;
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params, false);
             graph.compute();
@@ -481,8 +479,7 @@ void decodedPPL(const HyperParams &hyper_params, ModelParams &model_params,
         GraphBuilder graph_builder;
         graph_builder.forward(graph, post_sentences.at(post_id),
                 hyper_params, model_params, false);
-        DecoderComponents decoder_components(graph, model_params.left_to_right_decoder_params,
-                graph_builder.encoder_hiddens, hyper_params.dropout, false);
+        DecoderComponents decoder_components;
         graph_builder.forwardDecoder(graph, decoder_components,
                 decoded_sentence, hyper_params, model_params, false);
         graph.compute();
@@ -879,13 +876,14 @@ int main(int argc, const char *argv[]) {
         }
         model_params.transformer_encoder_params.init(hyper_params.hidden_layer,
                 hyper_params.hidden_dim, hyper_params.word_dim, hyper_params.head_count, 512);
-        model_params.left_to_right_decoder_params.init(hyper_params.hidden_layer,
-                hyper_params.hidden_dim, hyper_params.word_dim, hyper_params.head_count, 512);
+        model_params.attention_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
+        model_params.decoder_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim +
+                hyper_params.word_dim);
         model_params.hidden_to_wordvector_params.init(hyper_params.word_dim,
-                hyper_params.hidden_dim, false);
+                2 * hyper_params.hidden_dim + hyper_params.word_dim, false);
         model_params.output_bias_params.initAsBias(model_params.lookup_table.nVSize);
-        function<dtype(int, int)> init = [](int, int)->dtype {return 1;};
-        model_params.begin_emb.init(hyper_params.word_dim, 1, &init);
+        model_params.begin_emb.init(hyper_params.word_dim, 1);
+        model_params.hidden_embs.init(hyper_params.hidden_dim, 2);
     };
 
     int saved_epoch = -1;
@@ -1047,9 +1045,7 @@ int main(int argc, const char *argv[]) {
                     graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
                             model_params, true);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
-                    DecoderComponents decoder_components(graph,
-                            model_params.left_to_right_decoder_params,
-                            graph_builder->encoder_hiddens, hyper_params.dropout, true);
+                    DecoderComponents decoder_components;
                     graph_builder->forwardDecoder(graph, decoder_components,
                             response_sentences.at(response_id), hyper_params, model_params, true);
                     decoder_components_vector.push_back(decoder_components);
