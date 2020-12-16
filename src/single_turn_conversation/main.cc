@@ -161,7 +161,7 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     hyper_params.hidden_dim = encoding_hidden_dim;
 
     int hidden_layer = ini_reader.GetInteger("hyper", "hidden_layer", 0);
-    if (hidden_layer <= 0) {
+    if (hidden_layer < 0) {
         cerr << "hidden_layer wrong" << endl;
         abort();
     }
