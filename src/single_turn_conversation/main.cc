@@ -1090,7 +1090,7 @@ int main(int argc, const char *argv[]) {
                         }
                     }
                 }
-                cout << "loss:" << loss_sum << " ppl:" << exp(loss_sum / (batch_i + 1)) << endl;
+                cout << "loss:" << loss_sum << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
                 metric->print();
 
                 graph.backward();
@@ -1117,7 +1117,7 @@ int main(int argc, const char *argv[]) {
                                     conversation_pair.response_id), model_params.lookup_table);
                         vector<Node*> result_nodes = toNodePointers(
                                 decoder_components.wordvector_to_onehots);
-                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum).first;
+                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0).first;
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;
