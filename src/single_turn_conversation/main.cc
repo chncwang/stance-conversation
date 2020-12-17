@@ -1069,8 +1069,7 @@ int main(int argc, const char *argv[]) {
                             model_params.lookup_table);
                     vector<Node*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
-                    auto result = maxLogProbabilityLoss(result_nodes, word_ids,
-                            1.0 / word_sum);
+                    auto result = maxLogProbabilityLoss(result_nodes, word_ids, 1.0);
                     loss_sum += result.first;
 
                     analyze(result.second, word_ids, *metric);
