@@ -1009,14 +1009,13 @@ int main(int argc, const char *argv[]) {
             model_update._eps = 1e-9;
 
             int corpus_word_sum = 0;
-            hyper_params.warm_up_iterations = 1.0 / hyper_params.hidden_dim /
-                hyper_params.learning_rate / hyper_params.learning_rate;
             cout << "calculated warmup:" << hyper_params.warm_up_iterations << endl;
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
                 if (iteration + 1 < hyper_params.warm_up_iterations) {
-                    model_update._alpha = hyper_params.learning_rate;
+                    model_update._alpha = (iteration + 1) / sqrt(hyper_params.hidden_dim) /
+                        pow(hyper_params.warm_up_iterations, 1.5);
                 } else {
                     model_update._alpha = hyper_params.learning_rate * (hyper_params.lr_decay ?
                             pow(hyper_params.warm_up_iterations, 0.5) * pow(iteration + 1, -0.5) : 1);
