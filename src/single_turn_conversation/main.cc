@@ -1018,8 +1018,8 @@ int main(int argc, const char *argv[]) {
                     model_update._alpha = (iteration + 1) / sqrt(hyper_params.hidden_dim) /
                         pow(hyper_params.warm_up_iterations, 1.5);
                 } else {
-                    model_update._alpha = hyper_params.learning_rate * (hyper_params.lr_decay ?
-                            pow(hyper_params.warm_up_iterations, 0.5) * pow(iteration + 1, -0.5) : 1);
+                    model_update._alpha = 1.0 / sqrt(hyper_params.hidden_dim) *
+                                pow(iteration + 1, -0.5);
                 }
                 model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
