@@ -954,6 +954,7 @@ int main(int argc, const char *argv[]) {
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
         ModelUpdate model_update;
         model_update._alpha = hyper_params.learning_rate;
+        model_update._belta2 = 0.98;
         model_update._reg = hyper_params.l2_reg;
         model_update.setParams(model_params.tunableParams());
 
@@ -1020,6 +1021,7 @@ int main(int argc, const char *argv[]) {
                     model_update._alpha = hyper_params.learning_rate * (hyper_params.lr_decay ?
                             pow(hyper_params.warm_up_iterations, 0.5) * pow(iteration + 1, -0.5) : 1);
                 }
+                model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
