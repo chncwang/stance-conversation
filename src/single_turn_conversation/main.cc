@@ -884,6 +884,7 @@ int main(int argc, const char *argv[]) {
         model_params.output_bias_params.initAsBias(model_params.lookup_table.nVSize);
         model_params.begin_emb.init(hyper_params.word_dim, 1);
         model_params.hidden_embs.init(hyper_params.hidden_dim, 2);
+        model_params.layer_norm_params.init(hyper_params.hidden_dim);
     };
 
     int saved_epoch = -1;

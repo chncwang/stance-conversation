@@ -315,6 +315,8 @@ struct GraphBuilder {
 
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
                 encoder_lookups, hyper_params.dropout, is_training);
+        encoder_hiddens = layerNormalization(graph, model_params.layer_norm_params,
+                encoder_hiddens);
     }
 
     void forwardDecoder(Graph &graph, DecoderComponents &decoder_components,
@@ -323,6 +325,7 @@ struct GraphBuilder {
             ModelParams &model_params,
             bool is_training) {
         using namespace n3ldg_plus;
+
         for (int i = 0; i < answer.size(); ++i) {
             Node *last_input;
             if (i > 0) {
