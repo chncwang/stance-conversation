@@ -1014,14 +1014,14 @@ int main(int argc, const char *argv[]) {
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
-                if (iteration + 1 < hyper_params.warm_up_iterations) {
-                    model_update._alpha = (iteration + 1) / sqrt(hyper_params.hidden_dim) /
-                        pow(hyper_params.warm_up_iterations, 1.5);
-                } else {
-                    model_update._alpha = 1.0 / sqrt(hyper_params.hidden_dim) *
-                                pow(iteration + 1, -0.5);
-                }
-                model_update._alpha *= hyper_params.learning_rate;
+//                if (iteration + 1 < hyper_params.warm_up_iterations) {
+//                    model_update._alpha = (iteration + 1) / sqrt(hyper_params.hidden_dim) /
+//                        pow(hyper_params.warm_up_iterations, 1.5);
+//                } else {
+//                    model_update._alpha = 1.0 / sqrt(hyper_params.hidden_dim) *
+//                                pow(iteration + 1, -0.5);
+//                }
+                model_update._alpha = hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
