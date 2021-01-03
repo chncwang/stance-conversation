@@ -299,6 +299,14 @@ vector<BeamSearchResult> mostProbableResults(
     return final_results;
 }
 
+Node *embedding(Graph &graph, ModelParams &model_params, const string &word) {
+    Node *input_lookup = n3ldg_plus::embedding(graph, model_params.lookup_table, word);
+    Node *input_lookup_scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch,
+            word);
+    Node *concat = n3ldg_plus::concat(graph, {input_lookup, input_lookup_scratch});
+    return concat;
+}
+
 struct GraphBuilder {
     vector<Node *> encoder_lookups;
     vector<Node *> encoder_hiddens;
@@ -309,8 +317,9 @@ struct GraphBuilder {
             bool is_training) {
         using namespace n3ldg_plus;
         for (const string &word : sentence) {
-            Node *input_lookup = embedding(graph, model_params.lookup_table, word);
-            encoder_lookups.push_back(input_lookup);
+            Node *emb = embedding(graph, model_params, word);
+            emb = dropout(graph, *emb, hyper_params.dropout, is_training);
+            encoder_lookups.push_back(emb);
         }
 
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
@@ -326,7 +335,7 @@ struct GraphBuilder {
         for (int i = 0; i < answer.size(); ++i) {
             Node *last_input;
             if (i > 0) {
-                last_input = embedding(graph, model_params.lookup_table, answer.at(i - 1));
+                last_input = embedding(graph, model_params, answer.at(i - 1));
             } else {
                 last_input = embedding(graph, model_params.begin_emb, 0);
             }
@@ -341,14 +350,16 @@ struct GraphBuilder {
         for (int i = 0; i < answer.size(); ++i) {
             Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                     hyper_params, model_params, i);
-            decoder_components.decoder_to_wordvectors.push_back(decoder_to_wordvector);
             Node *wordvector_to_onehot = linearWordVector(graph, model_params.lookup_table.nVSize,
-                    model_params.lookup_table.E, *decoder_to_wordvector);
-//            wordvector_to_onehot = bias(graph, model_params.output_bias_params,
-//                    *wordvector_to_onehot);
-            wordvector_to_onehot = n3ldg_plus::scaled(graph, *wordvector_to_onehot,
-                    1.0 / ::sqrt(hyper_params.word_dim));
-            Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot);
+                    model_params.lookup_table.E,
+                    *split(graph, hyper_params.word_dim, *decoder_to_wordvector, 0));
+            Node *wordvector_to_onehot_scratch = linearWordVector(graph,
+                    model_params.lookup_table_scratch.nVSize,
+                    model_params.lookup_table_scratch.E,
+                    *split(graph, hyper_params.hidden_dim - hyper_params.word_dim,
+                        *decoder_to_wordvector, hyper_params.word_dim));
+            Node *sum = add(graph, {wordvector_to_onehot, wordvector_to_onehot_scratch});
+            Node *softmax = n3ldg_plus::softmax(graph, *sum);
             decoder_components.wordvector_to_onehots.push_back(softmax);
         }
     }

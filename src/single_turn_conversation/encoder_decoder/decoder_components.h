@@ -8,7 +8,6 @@
 
 struct DecoderComponents {
     std::vector<Node *> decoder_lookups;
-    std::vector<Node *> decoder_to_wordvectors;
     std::vector<Node *> wordvector_to_onehots;
     DynamicLSTMBuilder decoder;
     vector<Node *> contexts;
