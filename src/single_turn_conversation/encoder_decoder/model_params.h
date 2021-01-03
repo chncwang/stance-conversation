@@ -20,12 +20,14 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     Param hidden_embs;
     AdditiveAttentionParams attention_params;
     LSTM1Params decoder_params;
+    LayerNormalizationParams layer_norm_params;
 
     ModelParams() : lookup_table("lookup_table"), lookup_table_scratch("lookup_table_scratch"),
     hidden_to_wordvector_params("hidden_to_wordvector_params"),
     transformer_encoder_params("encoder"),
     output_bias_params("output_bias_params"), begin_emb("begin_emb"), hidden_embs("hidden_embs"),
-    attention_params("attention_params"), decoder_params("decoder_params") {}
+    attention_params("attention_params"), decoder_params("decoder_params"),
+    layer_norm_params("layer_norm_params") {}
 
     Json::Value toJson() const override {
         Json::Value json;
@@ -38,6 +40,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         json["hidden_embs"] = hidden_embs.toJson();
         json["attention_params"] = attention_params.toJson();
         json["decoder_params"] = decoder_params.toJson();
+        json["layer_norm_params"] = layer_norm_params.toJson();
         return json;
     }
 
@@ -51,13 +54,14 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         hidden_embs.fromJson(json["hidden_embs"]);
         attention_params.fromJson(json["attention_params"]);
         decoder_params.fromJson(json["decoder_params"]);
+        layer_norm_params.fromJson(json["layer_norm_params"]);
     }
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&lookup_table, &lookup_table_scratch, &hidden_to_wordvector_params,
-            &transformer_encoder_params,
-            &output_bias_params, &begin_emb, &hidden_embs, &attention_params, &decoder_params};
+            &transformer_encoder_params, &output_bias_params, &begin_emb, &hidden_embs,
+            &attention_params, &decoder_params, &layer_norm_params};
     }
 #endif
 
@@ -65,7 +69,7 @@ protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
         return {&lookup_table, &lookup_table_scratch, &hidden_to_wordvector_params,
             &transformer_encoder_params, &output_bias_params, &begin_emb, &hidden_embs,
-            &attention_params, &decoder_params};
+            &attention_params, &decoder_params, &layer_norm_params};
     }
 };
 

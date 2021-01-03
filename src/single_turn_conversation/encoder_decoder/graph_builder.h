@@ -324,6 +324,8 @@ struct GraphBuilder {
 
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
                 encoder_lookups, hyper_params.dropout, is_training);
+        encoder_hiddens = layerNormalization(graph, model_params.layer_norm_params,
+                encoder_hiddens);
     }
 
     void forwardDecoder(Graph &graph, DecoderComponents &decoder_components,
