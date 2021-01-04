@@ -337,7 +337,7 @@ struct GraphBuilder {
             if (i > 0) {
                 last_input = embedding(graph, model_params, answer.at(i - 1));
             } else {
-                last_input = embedding(graph, model_params.begin_emb, 0);
+                last_input = bucket(graph, hyper_params.hidden_dim, 0);
             }
             last_input = dropout(graph, *last_input, hyper_params.dropout, is_training);
             decoder_components.decoder_lookups.push_back(last_input);
