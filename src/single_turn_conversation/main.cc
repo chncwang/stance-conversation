@@ -952,6 +952,7 @@ int main(int argc, const char *argv[]) {
         }
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
         ModelUpdate model_update;
+        model_update._reg = hyper_params.l2_reg;
         model_update.setParams(model_params.tunableParams());
 
 #if USE_DOUBLE
