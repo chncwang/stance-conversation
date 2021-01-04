@@ -328,7 +328,7 @@ struct GraphBuilder {
             if (i > 0) {
                 last_input = embedding(graph, model_params.lookup_table, answer.at(i - 1));
             } else {
-                last_input = embedding(graph, model_params.begin_emb, 0);
+                last_input = bucket(graph, hyper_params.word_dim, 0);
             }
             last_input = dropout(graph, *last_input, hyper_params.dropout, is_training);
             decoder_components.decoder_lookups.push_back(last_input);
@@ -346,8 +346,8 @@ struct GraphBuilder {
                     model_params.lookup_table.E, *decoder_to_wordvector);
 //            wordvector_to_onehot = bias(graph, model_params.output_bias_params,
 //                    *wordvector_to_onehot);
-            wordvector_to_onehot = n3ldg_plus::scaled(graph, *wordvector_to_onehot,
-                    1.0 / ::sqrt(hyper_params.word_dim));
+//            wordvector_to_onehot = n3ldg_plus::scaled(graph, *wordvector_to_onehot,
+//                    1.0 / ::sqrt(hyper_params.word_dim));
             Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot);
             decoder_components.wordvector_to_onehots.push_back(softmax);
         }
