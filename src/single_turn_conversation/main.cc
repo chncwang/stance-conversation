@@ -979,6 +979,7 @@ int main(int argc, const char *argv[]) {
             for (int i = 0; i < epoch; ++i) {
                 lr = (lr - min_lr) * 0.5 + min_lr;
             }
+            model_update._alpha = lr;
 
             model_params.lookup_table.E.is_fixed = false;
 
@@ -1193,3 +1194,4 @@ int main(int argc, const char *argv[]) {
 
     return 0;
 }
+
