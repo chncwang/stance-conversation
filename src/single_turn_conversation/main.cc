@@ -956,7 +956,6 @@ int main(int argc, const char *argv[]) {
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
         ModelUpdate model_update;
         model_update._alpha = hyper_params.learning_rate;
-        model_update._belta2 = 0.98;
         model_update._reg = hyper_params.l2_reg;
         model_update.setParams(model_params.tunableParams());
 
@@ -1007,9 +1006,6 @@ int main(int argc, const char *argv[]) {
             unique_ptr<Metric> metric = unique_ptr<Metric>(new Metric);
             using namespace std::chrono;
             int duration_count = 1e3;
-            model_update._belta2 = 0.98;
-            model_update._belta1 = 0.9;
-            model_update._eps = 1e-9;
 
             int corpus_word_sum = 0;
             cout << "calculated warmup:" << hyper_params.warm_up_iterations << endl;
