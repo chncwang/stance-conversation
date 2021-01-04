@@ -1009,6 +1009,9 @@ int main(int argc, const char *argv[]) {
 
             int corpus_word_sum = 0;
             cout << "calculated warmup:" << hyper_params.warm_up_iterations << endl;
+
+            float smooth_log_ppl = -1;
+
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
@@ -1071,6 +1074,14 @@ int main(int argc, const char *argv[]) {
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
                     auto result = maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum);
                     loss_sum += result.first * word_sum;
+                    if (smooth_log_ppl > 0) {
+                        int n = i + batch_size * batch_i + 1;
+                        float p = max(1.0 / n, 0.0001);
+                        smooth_log_ppl = (1 - p) * smooth_log_ppl +
+                            p * result.first * word_sum / word_ids.size();
+                    } else {
+                        smooth_log_ppl = result.first * word_sum / word_ids.size();
+                    }
 
                     analyze(result.second, word_ids, *metric);
                     unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
@@ -1091,6 +1102,7 @@ int main(int argc, const char *argv[]) {
                     }
                 }
                 cout << "loss:" << loss_sum << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
+                cout << "smooth ppl:" << exp(smooth_log_ppl) << std::endl;
                 metric->print();
 
                 graph.backward();
