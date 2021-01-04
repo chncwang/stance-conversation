@@ -955,7 +955,6 @@ int main(int argc, const char *argv[]) {
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
         ModelUpdate model_update;
         model_update._alpha = hyper_params.learning_rate;
-        model_update._belta2 = 0.98;
         model_update._reg = hyper_params.l2_reg;
         model_update.setParams(model_params.tunableParams());
 
@@ -975,6 +974,12 @@ int main(int argc, const char *argv[]) {
 
         for (int epoch = saved_epoch + 1; epoch < default_config.max_epoch; ++epoch) {
             cout << "epoch:" << epoch << endl;
+
+            float lr = hyper_params.learning_rate;
+            float min_lr = 0.1 * lr;
+            for (int i = 0; i < epoch; ++i) {
+                lr = (lr - min_lr) * 0.5 + min_lr;
+            }
 
             model_params.lookup_table.E.is_fixed = false;
 
@@ -1006,23 +1011,12 @@ int main(int argc, const char *argv[]) {
             unique_ptr<Metric> metric = unique_ptr<Metric>(new Metric);
             using namespace std::chrono;
             int duration_count = 1e3;
-            model_update._belta2 = 0.98;
-            model_update._belta1 = 0.9;
-            model_update._eps = 1e-9;
 
             int corpus_word_sum = 0;
             cout << "calculated warmup:" << hyper_params.warm_up_iterations << endl;
             for (int batch_i = 0; batch_i < batch_count +
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
-                if (iteration + 1 < hyper_params.warm_up_iterations) {
-                    model_update._alpha = (iteration + 1) / sqrt(hyper_params.hidden_dim) /
-                        pow(hyper_params.warm_up_iterations, 1.5);
-                } else {
-                    model_update._alpha = 1.0 / sqrt(hyper_params.hidden_dim) *
-                                pow(iteration + 1, -0.5);
-                }
-                model_update._alpha *= hyper_params.learning_rate;
                 cout << "learning rate:" << model_update._alpha << endl;
                 auto start = high_resolution_clock::now();
                 cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
