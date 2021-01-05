@@ -882,7 +882,6 @@ int main(int argc, const char *argv[]) {
         model_params.decoder_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim * 2);
         model_params.hidden_to_wordvector_params.init(hyper_params.hidden_dim,
                 3 * hyper_params.hidden_dim, false);
-        model_params.output_bias_params.initAsBias(model_params.lookup_table.nVSize);
         model_params.layer_norm_params.init(hyper_params.hidden_dim);
     };
 
