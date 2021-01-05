@@ -40,7 +40,7 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         lookup_table.fromJson(json["lookup_table"]);
         lookup_table_scratch.fromJson(json["lookup_table_scratch"]);
         hidden_to_wordvector_params.fromJson(json["hidden_to_wordvector_params"]);
-        transformer_encoder_params.fromJson(json["left_to_right_encoder_params"]);
+        transformer_encoder_params.fromJson(json["transformer_encoder_params"]);
         attention_params.fromJson(json["attention_params"]);
         layer_norm_params.fromJson(json["layer_norm_params"]);
         decoder_params.fromJson(json["decoder_params"]);
