@@ -359,7 +359,7 @@ struct GraphBuilder {
                     model_params.lookup_table_scratch.E,
                     *split(graph, hyper_params.hidden_dim - hyper_params.word_dim,
                         *decoder_to_wordvector, hyper_params.word_dim));
-            Node *softmax = n3ldg_plus::softmax(graph, *add(graph, {onehot_a, onehot_b}));
+            Node *softmax = n3ldg_plus::softmax(graph, *add(graph, {onehot_a, onehot_b}), 1);
             decoder_components.wordvector_to_onehots.push_back(softmax);
         }
     }

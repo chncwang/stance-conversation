@@ -1113,9 +1113,7 @@ int main(int argc, const char *argv[]) {
                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
                                 hyper_params, model_params, true);
 
-                        DecoderComponents decoder_components(graph,
-                                model_params.left_to_right_decoder_params,
-                                graph_builder.encoder_hiddens, hyper_params.dropout, true);
+                        DecoderComponents decoder_components;
                         graph_builder.forwardDecoder(graph, decoder_components,
                                 response_sentences.at(conversation_pair.response_id),
                                 hyper_params, model_params, true);
@@ -1126,7 +1124,7 @@ int main(int argc, const char *argv[]) {
                                     conversation_pair.response_id), model_params.lookup_table);
                         vector<Node*> result_nodes = toNodePointers(
                                 decoder_components.wordvector_to_onehots);
-                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0).first;
+                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum).first;
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;
