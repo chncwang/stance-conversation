@@ -970,7 +970,8 @@ int main(int argc, const char *argv[]) {
                     (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
                     ++batch_i) {
                 if (iteration < hyper_params.warm_up_iterations) {
-                    model_update._alpha = hyper_params.learning_rate;
+                    model_update._alpha = hyper_params.learning_rate * iteration /
+                        hyper_params.warm_up_iterations;
                 } else {
                     model_update._alpha = hyper_params.learning_rate *
                         sqrt(hyper_params.warm_up_iterations) / sqrt(iteration);
