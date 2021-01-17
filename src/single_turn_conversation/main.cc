@@ -838,7 +838,8 @@ int main(int argc, const char *argv[]) {
                 hyper_params.head_count, 512);
         model_params.hidden_to_wordvector_params.init(hyper_params.hidden_dim,
                 hyper_params.hidden_dim, false);
-        model_params.layer_norm_params.init(hyper_params.hidden_dim);
+        model_params.enc_norm.init(hyper_params.hidden_dim);
+        model_params.dec_norm.init(hyper_params.hidden_dim);
     };
 
     int saved_epoch = -1;

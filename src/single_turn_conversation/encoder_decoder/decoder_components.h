@@ -19,8 +19,10 @@ struct DecoderComponents {
             ModelParams &model_params,
             int i) {
         using namespace n3ldg_plus;
+        Node *normed = layerNormalization(graph, model_params.dec_norm,
+                *decoder.hiddenLayers().back().at(i));
         Node *decoder_to_wordvector = n3ldg_plus::linear(graph,
-                model_params.hidden_to_wordvector_params, *decoder.hiddenLayers().back().back());
+                model_params.hidden_to_wordvector_params, *normed);
         return decoder_to_wordvector;
     }
 };
