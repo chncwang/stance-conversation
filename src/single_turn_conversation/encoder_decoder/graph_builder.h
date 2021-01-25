@@ -78,7 +78,7 @@ string getSentence(const vector<int> &word_ids_vector, const ModelParams &model_
 //class BeamSearchResult {
 //public:
 //    BeamSearchResult(Graph &graph, TransformerDecoderParams &params,
-//            const vector<Node *> &encoder_hiddens,
+//            const vector<AtomicNode *> &encoder_hiddens,
 //            dtype dropout,
 //            bool is_training) {
 //        ngram_counts_ = {0, 0, 0};
@@ -182,7 +182,7 @@ int countNgramDuplicate(const vector<int> &ids, int n) {
 //        const vector<string> &black_list,
 //        set<int> &searched_word_ids,
 //        Graph &graph) {
-//    vector<Node *> nodes;
+//    vector<AtomicNode *> nodes;
 //    for (const DecoderComponents &decoder_components : beam) {
 //        nodes.push_back(decoder_components.wordvector_to_onehots.at(current_word - 1));
 //        if (is_first) {
@@ -203,7 +203,7 @@ int countNgramDuplicate(const vector<int> &ids, int n) {
 //    priority_queue<BeamSearchResult, vector<BeamSearchResult>, decltype(cmp)> queue(cmp);
 //    vector<BeamSearchResult> results;
 //    for (int i = 0; i < (is_first ? 1 : nodes.size()); ++i) {
-//        Node &node = *nodes.at(i);
+//        AtomicNode &node = *nodes.at(i);
 //#if USE_GPU
 //        node.val().initOnMemory(node.getDim());
 //        node.val().copyFromDeviceToHost();
@@ -299,16 +299,16 @@ int countNgramDuplicate(const vector<int> &ids, int n) {
 //    return final_results;
 //}
 
-Node *embedding(Graph &graph, ModelParams &model_params, const string &word) {
+AtomicNode *embedding(Graph &graph, ModelParams &model_params, const string &word) {
     using namespace n3ldg_plus;
-    Node *pretrained = embedding(graph, model_params.lookup_table, word);
-    Node *scratch = embedding(graph, model_params.lookup_table_scratch, word);
+    AtomicNode *pretrained = embedding(graph, model_params.lookup_table, word);
+    AtomicNode *scratch = embedding(graph, model_params.lookup_table_scratch, word);
     return concat(graph, {pretrained, scratch});
 }
 
 struct GraphBuilder {
-    vector<Node *> encoder_lookups;
-    vector<Node *> encoder_hiddens;
+    vector<AtomicNode *> encoder_lookups;
+    vector<AtomicNode *> encoder_hiddens;
 
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
@@ -316,7 +316,7 @@ struct GraphBuilder {
             bool is_training) {
         using namespace n3ldg_plus;
         for (const string &word : sentence) {
-            Node *input_lookup = embedding(graph, model_params, word);
+            AtomicNode *input_lookup = embedding(graph, model_params, word);
             encoder_lookups.push_back(input_lookup);
         }
 
@@ -335,7 +335,7 @@ struct GraphBuilder {
         decoder_components.decoder.prepare();
 
         for (int i = 0; i < answer.size(); ++i) {
-            Node *last_input;
+            AtomicNode *last_input;
             if (i > 0) {
                 last_input = embedding(graph, model_params, answer.at(i - 1));
             } else {
@@ -346,16 +346,16 @@ struct GraphBuilder {
         }
 
         for (int i = 0; i < answer.size(); ++i) {
-            Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
+            AtomicNode *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                     hyper_params, model_params, i);
-            Node *onehot_a = linearWordVector(graph, model_params.lookup_table.nVSize,
+            AtomicNode *onehot_a = linearWordVector(graph, model_params.lookup_table.nVSize,
                     model_params.lookup_table.E,
                     *split(graph, hyper_params.word_dim, *decoder_to_wordvector, 0));
-            Node *onehot_b = linearWordVector(graph, model_params.lookup_table.nVSize,
+            AtomicNode *onehot_b = linearWordVector(graph, model_params.lookup_table.nVSize,
                     model_params.lookup_table_scratch.E,
                     *split(graph, hyper_params.hidden_dim - hyper_params.word_dim,
                         *decoder_to_wordvector, hyper_params.word_dim));
-            Node *softmax = n3ldg_plus::softmax(graph, *add(graph, {onehot_a, onehot_b}), 1);
+            AtomicNode *softmax = n3ldg_plus::softmax(graph, *add(graph, {onehot_a, onehot_b}), 1);
             decoder_components.wordvector_to_onehots.push_back(softmax);
         }
     }

@@ -376,7 +376,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params, false);
             graph.compute();
-            vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
+            vector<AtomicNode*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
             vector<int> word_ids = transferVector<int, string>(
                     response_sentences.at(response_id), [&](const string &w) -> int {
                     return model_params.lookup_table.getElemId(w);
@@ -706,6 +706,7 @@ int main(int argc, const char *argv[]) {
     cout << "default_config:" << endl;
     default_config.print();
     globalPoolEnabled() = (default_config.program_mode == ProgramMode::TRAINING);
+    globalLimitedDimEnabled() = true;
 
 #if USE_GPU
     n3ldg_cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
@@ -1025,7 +1026,7 @@ int main(int argc, const char *argv[]) {
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
                     vector<int> word_ids = toIds(response_sentences.at(response_id),
                             model_params.lookup_table);
-                    vector<Node*> result_nodes =
+                    vector<AtomicNode*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
                     auto result = maxLogProbabilityLoss(result_nodes, word_ids,
                             1.0 / word_sum);
@@ -1072,7 +1073,8 @@ int main(int argc, const char *argv[]) {
                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
                                 hyper_params, model_params, true);
 
-                        DecoderComponents decoder_components;
+                        DecoderComponents decoder_components(graph, model_params.decoder_params,
+                                graph_builder.encoder_hiddens, hyper_params.dropout, true);
                         graph_builder.forwardDecoder(graph, decoder_components,
                                 response_sentences.at(conversation_pair.response_id),
                                 hyper_params, model_params, true);
@@ -1081,7 +1083,7 @@ int main(int argc, const char *argv[]) {
 
                         vector<int> word_ids = toIds(response_sentences.at(
                                     conversation_pair.response_id), model_params.lookup_table);
-                        vector<Node*> result_nodes = toNodePointers(
+                        vector<AtomicNode*> result_nodes = toNodePointers(
                                 decoder_components.wordvector_to_onehots);
                         return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum).first;
                     };

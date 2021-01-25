@@ -11,7 +11,7 @@
 
 #include "N3LDG.h"
 
-float computePerplex(const std::vector<Node *> &nodes, const std::vector<int> &answers,
+float computePerplex(const std::vector<AtomicNode *> &nodes, const std::vector<int> &answers,
         int &hit_count,
         vector<int> &hit_flags,
         int hit_beam) {
@@ -24,7 +24,7 @@ float computePerplex(const std::vector<Node *> &nodes, const std::vector<int> &a
     hit_flags.clear();
 
     for (int i = 0; i < nodes.size(); ++i) {
-        Node &node = *nodes.at(i);
+        AtomicNode &node = *nodes.at(i);
         int answer = answers.at(i);
         if (answer < 0 || answer >= node.getDim()) {
             cerr << boost::format("answer:%1% dim:%2%") << answer << node.getDim() << endl;
