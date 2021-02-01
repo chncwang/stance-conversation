@@ -8,10 +8,9 @@
 
 struct DecoderComponents {
     vector<Node *> wordvector_to_onehots;
-    n3ldg_plus::TransformerDecoderCellBuilder decoder;
+    n3ldg_plus::TransformerDecoderBuilder decoder;
 
-    DecoderComponents(Graph &graph, TransformerDecoderParams &params,
-            const vector<Node *> &encoder_hiddens,
+    DecoderComponents(Graph &graph, TransformerDecoderParams &params, BatchedNode &encoder_hiddens,
             dtype dropout,
             bool is_training) : decoder(graph, params, encoder_hiddens, dropout, is_training) {}
 
@@ -20,9 +19,19 @@ struct DecoderComponents {
             int i) {
         using namespace n3ldg_plus;
         Node *normed = layerNormalization(graph, model_params.dec_norm,
-                *decoder.hiddenLayers().back().at(i));
-        Node *decoder_to_wordvector = n3ldg_plus::linear(graph,
-                model_params.hidden_to_wordvector_params, *normed);
+                *decoder.hiddenLayers().back()->batch().at(i));
+        Node *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
+                model_params.hidden_to_wordvector_params);
+        return decoder_to_wordvector;
+    }
+
+    BatchedNode* decoderToWordVectors(Graph &graph, const HyperParams &hyper_params,
+            ModelParams &model_params) {
+        using namespace n3ldg_plus;
+        BatchedNode *normed = layerNormalization(graph, model_params.dec_norm,
+                *decoder.hiddenLayers().back());
+        BatchedNode *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
+                model_params.hidden_to_wordvector_params);
         return decoder_to_wordvector;
     }
 };

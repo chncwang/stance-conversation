@@ -372,7 +372,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params, false);
             DecoderComponents decoder_components(graph, model_params.decoder_params,
-                    graph_builder.encoder_hiddens, hyper_params.dropout, false);
+                    *graph_builder.encoder_hiddens, hyper_params.dropout, false);
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params, false);
             graph.compute();
@@ -706,7 +706,9 @@ int main(int argc, const char *argv[]) {
     cout << "default_config:" << endl;
     default_config.print();
     globalPoolEnabled() = (default_config.program_mode == ProgramMode::TRAINING);
+#if USE_GPU
     globalLimitedDimEnabled() = true;
+#endif
 
 #if USE_GPU
     n3ldg_cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
@@ -796,6 +798,7 @@ int main(int argc, const char *argv[]) {
         };
         wordStat();
         word_counts[unknownkey] = 1000000000;
+        word_counts[BEGIN_SYMBOL] = 1000000000;
         alphabet.init(word_counts, hyper_params.word_cutoff);
         cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
     } else if (default_config.split_unknown_words) {
@@ -968,9 +971,9 @@ int main(int argc, const char *argv[]) {
 
             float smooth_log_ppl = -1;
 
-            for (int batch_i = 0; batch_i < batch_count +
-                    (train_conversation_pairs.size() > hyper_params.batch_size * batch_count);
-                    ++batch_i) {
+            for (int batch_i = 0; batch_i < batch_count + (train_conversation_pairs.size() >
+                        hyper_params.batch_size * batch_count); ++batch_i) {
+//                if (batch_i > 10000) exit(0);
                 if (iteration < hyper_params.warm_up_iterations) {
                     model_update._alpha = hyper_params.learning_rate;
                 } else {
@@ -984,7 +987,7 @@ int main(int argc, const char *argv[]) {
                     train_conversation_pairs.size() % hyper_params.batch_size :
                     hyper_params.batch_size;
                 profiler.BeginEvent("build graph");
-                Graph graph(false);
+                Graph graph(true);
                 vector<shared_ptr<GraphBuilder>> graph_builders;
                 vector<DecoderComponents> decoder_components_vector;
                 vector<ConversationPair> conversation_pair_in_batch;
@@ -1002,7 +1005,7 @@ int main(int argc, const char *argv[]) {
                             model_params, true);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
                     DecoderComponents decoder_components(graph, model_params.decoder_params,
-                            graph_builder->encoder_hiddens, hyper_params.dropout, true);
+                            *graph_builder->encoder_hiddens, hyper_params.dropout, true);
 
                     graph_builder->forwardDecoder(graph, decoder_components,
                             response_sentences.at(response_id), hyper_params, model_params, true);
@@ -1028,8 +1031,7 @@ int main(int argc, const char *argv[]) {
                             model_params.lookup_table);
                     vector<Node*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
-                    auto result = maxLogProbabilityLoss(result_nodes, word_ids,
-                            1.0 / word_sum);
+                    auto result = maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum);
                     loss_sum += result.first * word_sum;
                     if (smooth_log_ppl > 0) {
                         int n = i + batch_size * batch_i + 1;
@@ -1074,7 +1076,7 @@ int main(int argc, const char *argv[]) {
                                 hyper_params, model_params, true);
 
                         DecoderComponents decoder_components(graph, model_params.decoder_params,
-                                graph_builder.encoder_hiddens, hyper_params.dropout, true);
+                                *graph_builder.encoder_hiddens, hyper_params.dropout, true);
                         graph_builder.forwardDecoder(graph, decoder_components,
                                 response_sentences.at(conversation_pair.response_id),
                                 hyper_params, model_params, true);

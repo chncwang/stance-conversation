@@ -313,7 +313,7 @@ BatchedNode &embedding(Graph &graph, ModelParams &model_params, const vector<str
 }
 
 struct GraphBuilder {
-    vector<Node *> encoder_hiddens;
+    BatchedNode *encoder_hiddens;
 
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
@@ -323,7 +323,7 @@ struct GraphBuilder {
         BatchedNode &emb = embedding(graph, model_params, sentence);
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
                 emb, hyper_params.dropout, is_training);
-        encoder_hiddens = layerNormalization(graph, model_params.enc_norm, encoder_hiddens);
+        encoder_hiddens = layerNormalization(graph, model_params.enc_norm, *encoder_hiddens);
     }
 
     void forwardDecoder(Graph &graph, DecoderComponents &decoder_components,
@@ -335,30 +335,26 @@ struct GraphBuilder {
 
         decoder_components.decoder.prepare();
 
-        for (int i = 0; i < answer.size(); ++i) {
-            Node *last_input;
-            if (i > 0) {
-                last_input = embedding(graph, model_params, answer.at(i - 1));
-            } else {
-                last_input = bucket(graph, hyper_params.hidden_dim, 0);
-            }
-
-            decoder_components.decoder.forward(*last_input);
+        vector<string> words;
+        words.push_back(BEGIN_SYMBOL);
+        for (int i = 1; i < answer.size(); ++i) {
+            words.push_back(answer.at(i - 1));
         }
+        BatchedNode &emb = embedding(graph, model_params, words);
 
-        for (int i = 0; i < answer.size(); ++i) {
-            Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
-                    hyper_params, model_params, i);
-            Node *onehot_a = linearWordVector(graph, model_params.lookup_table.nVSize,
-                    model_params.lookup_table.E,
-                    *split(graph, hyper_params.word_dim, *decoder_to_wordvector, 0));
-            Node *onehot_b = linearWordVector(graph, model_params.lookup_table.nVSize,
-                    model_params.lookup_table_scratch.E,
-                    *split(graph, hyper_params.hidden_dim - hyper_params.word_dim,
-                        *decoder_to_wordvector, hyper_params.word_dim));
-            Node *softmax = n3ldg_plus::softmax(graph, *add(graph, {onehot_a, onehot_b}), 1);
-            decoder_components.wordvector_to_onehots.push_back(softmax);
-        }
+        decoder_components.decoder.forward(emb);
+
+        BatchedNode *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
+                hyper_params, model_params);
+        BatchedNode *onehot_a = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
+                    hyper_params.word_dim, 0), 
+                model_params.lookup_table.E, model_params.lookup_table.nVSize);
+        BatchedNode *onehot_b = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
+                    hyper_params.hidden_dim - hyper_params.word_dim, hyper_params.word_dim),
+                model_params.lookup_table_scratch.E, model_params.lookup_table.nVSize);
+        BatchedNode *softmax = n3ldg_plus::softmax(graph, *addInBatch(graph, {onehot_a, onehot_b}),
+                1);
+        decoder_components.wordvector_to_onehots = softmax->batch();
     }
 
     void forwardDecoderByOneStep(Graph &graph, DecoderComponents &decoder_components, int i,
