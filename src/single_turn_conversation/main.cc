@@ -705,8 +705,9 @@ int main(int argc, const char *argv[]) {
     default_config = parseDefaultConfig(ini_reader);
     cout << "default_config:" << endl;
     default_config.print();
-    globalPoolEnabled() = (default_config.program_mode == ProgramMode::TRAINING);
-#if USE_GPU
+//    globalPoolEnabled() = (default_config.program_mode == ProgramMode::TRAINING);
+    globalPoolEnabled() = true;
+#if USE_GPU && !TEST_CUDA
     globalLimitedDimEnabled() = true;
 #endif
 
@@ -833,15 +834,20 @@ int main(int argc, const char *argv[]) {
             } else {
                 model_params.lookup_table.init(*alphabet, hyper_params.word_dim, true);
             }
-            model_params.lookup_table_scratch.init(*alphabet,
-                    hyper_params.hidden_dim - hyper_params.word_dim, true);
+            if (hyper_params.hidden_dim > hyper_params.word_dim) {
+                model_params.lookup_table_scratch.init(*alphabet,
+                        hyper_params.hidden_dim - hyper_params.word_dim, true);
+            }
         }
         model_params.transformer_encoder_params.init(hyper_params.hidden_layer,
                 hyper_params.hidden_dim, hyper_params.head_count, 512);
         model_params.decoder_params.init(hyper_params.hidden_layer, hyper_params.hidden_dim,
                 hyper_params.head_count, 512);
-        model_params.hidden_to_wordvector_params.init(hyper_params.hidden_dim,
-                hyper_params.hidden_dim, false);
+        model_params.hidden_to_wordvector_params.init(
+//                model_params.lookup_table.nVSize,
+                hyper_params.hidden_dim,
+                hyper_params.hidden_dim,
+                false);
         model_params.enc_norm.init(hyper_params.hidden_dim);
         model_params.dec_norm.init(hyper_params.hidden_dim);
     };
@@ -987,7 +993,7 @@ int main(int argc, const char *argv[]) {
                     train_conversation_pairs.size() % hyper_params.batch_size :
                     hyper_params.batch_size;
                 profiler.BeginEvent("build graph");
-                Graph graph(true);
+                Graph graph(false);
                 vector<shared_ptr<GraphBuilder>> graph_builders;
                 vector<DecoderComponents> decoder_components_vector;
                 vector<ConversationPair> conversation_pair_in_batch;

@@ -308,8 +308,14 @@ Node *embedding(Graph &graph, ModelParams &model_params, const string &word) {
 
 BatchedNode &embedding(Graph &graph, ModelParams &model_params, const vector<string> &words) {
     BatchedNode *pretrained = n3ldg_plus::embedding(graph, model_params.lookup_table, words);
-    BatchedNode *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch, words);
-    return *n3ldg_plus::concatInBatch(graph, {pretrained, scratch});
+    if (model_params.lookup_table.E.outDim() ==
+            model_params.transformer_encoder_params.hiddenDim()) {
+        return *pretrained;
+    } else {
+        BatchedNode *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch,
+                words);
+        return *n3ldg_plus::concatInBatch(graph, {pretrained, scratch});
+    }
 }
 
 struct GraphBuilder {
@@ -346,14 +352,18 @@ struct GraphBuilder {
 
         BatchedNode *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                 hyper_params, model_params);
-        BatchedNode *onehot_a = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
-                    hyper_params.word_dim, 0), 
+        BatchedNode *onehot_a = linearWordVector(graph, *decoder_to_wordvector,
                 model_params.lookup_table.E, model_params.lookup_table.nVSize);
-        BatchedNode *onehot_b = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
-                    hyper_params.hidden_dim - hyper_params.word_dim, hyper_params.word_dim),
-                model_params.lookup_table_scratch.E, model_params.lookup_table.nVSize);
-        BatchedNode *softmax = n3ldg_plus::softmax(graph, *addInBatch(graph, {onehot_a, onehot_b}),
-                1);
+//        BatchedNode *onehot_a = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
+//                    hyper_params.word_dim, 0), 
+//                model_params.lookup_table.E, model_params.lookup_table.nVSize);
+//        BatchedNode *onehot_b = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
+//                    hyper_params.hidden_dim - hyper_params.word_dim, hyper_params.word_dim),
+//                model_params.lookup_table_scratch.E, model_params.lookup_table.nVSize);
+//        BatchedNode *softmax = n3ldg_plus::softmax(graph, *addInBatch(graph, {onehot_a, onehot_b}),
+//                1);
+        BatchedNode *softmax = n3ldg_plus::softmax(graph, *onehot_a, 1);
+//        BatchedNode *softmax = n3ldg_plus::softmax(graph, *decoder_to_wordvector, 1);
         decoder_components.wordvector_to_onehots = softmax->batch();
     }
 
