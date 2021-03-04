@@ -55,7 +55,7 @@ if(CMAKE_BUILD_TYPE MATCHES debug)
 elseif(CMAKE_BUILD_TYPE MATCHES profile)
     SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -pg -DNDEBUG" )
 else()
-    SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC -std=c++11 -O3 -march=native" )
+    SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC -std=c++11 -Ofast -march=native" )
 endif()
 
 SET(Boost_USE_STATIC_LIBS OFF) 

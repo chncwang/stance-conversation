@@ -371,8 +371,9 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             GraphBuilder graph_builder;
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params, false);
+            int src_sentence_len = post_sentences.at(post_and_responses.post_id).size();
             DecoderComponents decoder_components(graph, model_params.decoder_params,
-                    *graph_builder.encoder_hiddens, hyper_params.dropout, false);
+                    *graph_builder.encoder_hiddens, src_sentence_len, hyper_params.dropout, false);
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params, false);
             graph.compute();
@@ -1010,8 +1011,10 @@ int main(int argc, const char *argv[]) {
                     graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
                             model_params, true);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
+                    int src_sentence_len = post_sentences.at(post_id).size();
                     DecoderComponents decoder_components(graph, model_params.decoder_params,
-                            *graph_builder->encoder_hiddens, hyper_params.dropout, true);
+                            *graph_builder->encoder_hiddens, src_sentence_len,
+                            hyper_params.dropout, true);
 
                     graph_builder->forwardDecoder(graph, decoder_components,
                             response_sentences.at(response_id), hyper_params, model_params, true);
@@ -1080,9 +1083,11 @@ int main(int argc, const char *argv[]) {
 
                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
                                 hyper_params, model_params, true);
+                        int src_len = post_sentences.at(conversation_pair.post_id).size();
 
                         DecoderComponents decoder_components(graph, model_params.decoder_params,
-                                *graph_builder.encoder_hiddens, hyper_params.dropout, true);
+                                *graph_builder.encoder_hiddens, src_len, hyper_params.dropout,
+                                true);
                         graph_builder.forwardDecoder(graph, decoder_components,
                                 response_sentences.at(conversation_pair.response_id),
                                 hyper_params, model_params, true);
@@ -1160,4 +1165,3 @@ int main(int argc, const char *argv[]) {
 
     return 0;
 }
-
