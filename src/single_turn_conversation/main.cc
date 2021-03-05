@@ -987,9 +987,13 @@ int main(int argc, const char *argv[]) {
                     model_update._alpha = hyper_params.learning_rate *
                         sqrt(hyper_params.warm_up_iterations) / sqrt(iteration);
                 }
-                cout << "learning rate:" << model_update._alpha << endl;
+                if (batch_i % 100 == 99) {
+                    cout << "learning rate:" << model_update._alpha << endl;
+                }
                 auto start = high_resolution_clock::now();
-                cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
+                if (batch_i % 100 == 99) {
+                    cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
+                }
                 int batch_size = batch_i == batch_count ?
                     train_conversation_pairs.size() % hyper_params.batch_size :
                     hyper_params.batch_size;
@@ -1033,45 +1037,56 @@ int main(int argc, const char *argv[]) {
                 }
                 corpus_word_sum += word_sum;
 
+                vector<Node *> total_result_nodes;
+                vector<int> total_word_ids;
+
                 for (int i = 0; i < batch_size; ++i) {
                     int instance_index = getSentenceIndex(i);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
                     vector<int> word_ids = toIds(response_sentences.at(response_id),
                             model_params.lookup_table);
+                    for (int id : word_ids) {
+                        total_word_ids.push_back(id);
+                    }
                     vector<Node*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
-                    auto result = maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum);
-                    loss_sum += result.first * word_sum;
-                    if (smooth_log_ppl > 0) {
-                        int n = i + batch_size * batch_i + 1;
-                        float p = max(1.0 / n, 0.0001);
-                        smooth_log_ppl = (1 - p) * smooth_log_ppl +
-                            p * result.first * word_sum / word_ids.size();
-                    } else {
-                        smooth_log_ppl = result.first * word_sum / word_ids.size();
-                    }
-
-                    analyze(result.second, word_ids, *metric);
-                    unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
-                    analyze(result.second, word_ids, *local_metric);
-
-                    if (local_metric->getAccuracy() < 1.0f) {
-                        static int count_for_print;
-                        if (++count_for_print % 100 == 0) {
-                            count_for_print = 0;
-                            int post_id = train_conversation_pairs.at(instance_index).post_id;
-                            cout << "post:" << post_id << endl;
-                            print(post_sentences.at(post_id));
-                            cout << "golden answer:" << endl;
-                            printWordIds(word_ids, model_params.lookup_table);
-                            cout << "output:" << endl;
-                            printWordIds(result.second, model_params.lookup_table);
-                        }
+                    for (Node *node : result_nodes) {
+                        total_result_nodes.push_back(node);
                     }
                 }
-                cout << "loss:" << loss_sum << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
-                cout << "smooth ppl:" << exp(smooth_log_ppl) << std::endl;
-                metric->print();
+                auto result = maxLogProbabilityLoss(total_result_nodes, total_word_ids,
+                        1.0 / word_sum);
+                loss_sum += result.first * word_sum;
+                if (smooth_log_ppl > 0) {
+                    int n = batch_i + 1;
+                    float p = max(1.0 / n, 0.0001);
+                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * result.first;
+                } else {
+                    smooth_log_ppl = result.first;
+                }
+
+                analyze(result.second, total_word_ids, *metric);
+                unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
+                analyze(result.second, total_word_ids, *local_metric);
+
+//                if (local_metric->getAccuracy() < 1.0f) {
+//                    static int count_for_print;
+//                    if (++count_for_print % 100 == 0) {
+//                        count_for_print = 0;
+//                        int post_id = train_conversation_pairs.at(instance_index).post_id;
+//                        cout << "post:" << post_id << endl;
+//                        print(post_sentences.at(post_id));
+//                        cout << "golden answer:" << endl;
+//                        printWordIds(word_ids, model_params.lookup_table);
+//                        cout << "output:" << endl;
+//                        printWordIds(result.second, model_params.lookup_table);
+//                    }
+//                }
+                if (batch_i % 100 == 99) {
+//                    cout << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
+                    cout << "ppl:" << exp(smooth_log_ppl) << std::endl;
+                    metric->print();
+                }
 
                 graph.backward();
 
@@ -1119,8 +1134,10 @@ int main(int argc, const char *argv[]) {
                 }
                 auto stop = high_resolution_clock::now();
                 auto duration = duration_cast<milliseconds>(stop - start);
-                duration_count = 0.99 * duration_count + 0.01 * duration.count();
-                cout << "duration:" << duration_count << endl;
+                duration_count = 0.9 * duration_count + 0.1 * duration.count();
+                if (batch_i % 100 == 99) {
+                    cout << "duration:" << duration_count << endl;
+                }
 
                 if (default_config.save_model_per_batch) {
                     saveModel(hyper_params, model_params, default_config.output_model_file_prefix,

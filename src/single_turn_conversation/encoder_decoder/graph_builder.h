@@ -352,7 +352,7 @@ struct GraphBuilder {
         decoder_components.decoder.forward(emb);
 
         BatchedNode *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
-                hyper_params, model_params);
+                answer.size(), hyper_params, model_params);
         BatchedNode *onehot_a = linearWordVector(graph, *decoder_to_wordvector,
                 model_params.lookup_table.E, model_params.lookup_table.nVSize);
 //        BatchedNode *onehot_a = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
