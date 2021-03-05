@@ -987,11 +987,11 @@ int main(int argc, const char *argv[]) {
                     model_update._alpha = hyper_params.learning_rate *
                         sqrt(hyper_params.warm_up_iterations) / sqrt(iteration);
                 }
-                if (batch_i % 100 == 99) {
+                if (batch_i % 10 == 5) {
                     cout << "learning rate:" << model_update._alpha << endl;
                 }
                 auto start = high_resolution_clock::now();
-                if (batch_i % 100 == 99) {
+                if (batch_i % 10 == 5) {
                     cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
                 }
                 int batch_size = batch_i == batch_count ?
@@ -1082,7 +1082,7 @@ int main(int argc, const char *argv[]) {
 //                        printWordIds(result.second, model_params.lookup_table);
 //                    }
 //                }
-                if (batch_i % 100 == 99) {
+                if (batch_i % 10 == 5) {
 //                    cout << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
                     cout << "ppl:" << exp(smooth_log_ppl) << std::endl;
                     metric->print();
@@ -1135,7 +1135,7 @@ int main(int argc, const char *argv[]) {
                 auto stop = high_resolution_clock::now();
                 auto duration = duration_cast<milliseconds>(stop - start);
                 duration_count = 0.9 * duration_count + 0.1 * duration.count();
-                if (batch_i % 100 == 99) {
+                if (batch_i % 10 == 5) {
                     cout << "duration:" << duration_count << endl;
                 }
 
