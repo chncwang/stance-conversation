@@ -29,17 +29,17 @@ struct DecoderComponents {
             const HyperParams &hyper_params,
             ModelParams &model_params) {
         using namespace n3ldg_plus;
-        Node *normed = layerNormalization(graph, model_params.dec_norm,
-                *decoder.hiddenLayers().back(), dec_sentence_len);
-        vector<int> offsets(dec_sentence_len);
-        for (int i = 0; i < dec_sentence_len; ++i) {
-            offsets.at(i) = i * hyper_params.hidden_dim;
-        }
-        Node *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
-                model_params.hidden_to_wordvector_params, dec_sentence_len);
-        BatchedNode *batched_normed = split(graph, *decoder_to_wordvector, hyper_params.hidden_dim,
-                offsets);
-        return batched_normed;
+        BatchedNode *normed = layerNormalization(graph, model_params.dec_norm,
+                *decoder.hiddenLayers().back());
+//        vector<int> offsets(dec_sentence_len);
+//        for (int i = 0; i < dec_sentence_len; ++i) {
+//            offsets.at(i) = i * hyper_params.hidden_dim;
+//        }
+        BatchedNode *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
+                model_params.hidden_to_wordvector_params);
+//        BatchedNode *batched_normed = split(graph, *decoder_to_wordvector, hyper_params.hidden_dim,
+//                offsets);
+        return decoder_to_wordvector;
     }
 };
 
