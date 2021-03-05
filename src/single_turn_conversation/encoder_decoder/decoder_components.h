@@ -10,9 +10,9 @@ struct DecoderComponents {
     vector<Node *> wordvector_to_onehots;
     n3ldg_plus::TransformerDecoderBuilder decoder;
 
-    DecoderComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,
+    DecoderComponents(Graph &graph, TransformerDecoderParams &params, BatchedNode &encoder_hiddens,
             int src_sentence_len, dtype dropout, bool is_training) : decoder(graph, params,
-                encoder_hiddens, src_sentence_len, dropout, is_training) {}
+                encoder_hiddens, dropout, is_training) {}
 
     Node* decoderToWordVectors(Graph &graph, const HyperParams &hyper_params,
             ModelParams &model_params,

@@ -319,7 +319,7 @@ BatchedNode &embedding(Graph &graph, ModelParams &model_params, const vector<str
 }
 
 struct GraphBuilder {
-    Node *encoder_hiddens;
+    BatchedNode *encoder_hiddens;
 
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
@@ -329,8 +329,7 @@ struct GraphBuilder {
         BatchedNode &emb = embedding(graph, model_params, sentence);
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
                 emb, hyper_params.dropout, is_training);
-        encoder_hiddens = layerNormalization(graph, model_params.enc_norm, *encoder_hiddens,
-                sentence.size());
+        encoder_hiddens = layerNormalization(graph, model_params.enc_norm, *encoder_hiddens);
     }
 
     void forwardDecoder(Graph &graph, DecoderComponents &decoder_components,
