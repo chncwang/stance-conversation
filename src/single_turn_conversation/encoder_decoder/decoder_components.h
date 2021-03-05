@@ -8,38 +8,36 @@
 
 struct DecoderComponents {
     vector<Node *> wordvector_to_onehots;
-    n3ldg_plus::TransformerDecoderBuilder decoder;
+    n3ldg_plus::TransformerDecoderCellBuilder decoder;
 
-    DecoderComponents(Graph &graph, TransformerDecoderParams &params, BatchedNode &encoder_hiddens,
-            int src_sentence_len, dtype dropout, bool is_training) : decoder(graph, params,
-                encoder_hiddens, dropout, is_training) {}
+    DecoderComponents(Graph &graph, TransformerDecoderParams &params,
+            vector<Node *> &encoder_hiddens, int src_sentence_len, dtype dropout,
+            bool is_training) : decoder(graph, params, encoder_hiddens, dropout, is_training) {}
 
     Node* decoderToWordVectors(Graph &graph, const HyperParams &hyper_params,
             ModelParams &model_params,
             int i) {
         using namespace n3ldg_plus;
-        Node *normed = layerNormalization(graph, model_params.dec_norm,
-                *decoder.hiddenLayers().back()->batch().at(i));
-        Node *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
-                model_params.hidden_to_wordvector_params);
+        auto normed = layerNormalization(graph, model_params.dec_norm,
+                *decoder.hiddenLayers().back().at(i));
+        Node *decoder_to_wordvector = n3ldg_plus::linear(graph,
+                model_params.hidden_to_wordvector_params, *normed);
         return decoder_to_wordvector;
     }
 
-    BatchedNode* decoderToWordVectors(Graph &graph, int dec_sentence_len,
+    vector<Node *> decoderToWordVectors(Graph &graph, int dec_sentence_len,
             const HyperParams &hyper_params,
             ModelParams &model_params) {
         using namespace n3ldg_plus;
-        BatchedNode *normed = layerNormalization(graph, model_params.dec_norm,
-                *decoder.hiddenLayers().back());
-//        vector<int> offsets(dec_sentence_len);
-//        for (int i = 0; i < dec_sentence_len; ++i) {
-//            offsets.at(i) = i * hyper_params.hidden_dim;
-//        }
-        BatchedNode *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
-                model_params.hidden_to_wordvector_params);
-//        BatchedNode *batched_normed = split(graph, *decoder_to_wordvector, hyper_params.hidden_dim,
-//                offsets);
-        return decoder_to_wordvector;
+        auto normed = layerNormalization(graph, model_params.dec_norm,
+                decoder.hiddenLayers().back());
+        vector<Node *> results;
+        for (Node *in : normed) {
+            Node *decoder_to_wordvector = n3ldg_plus::linear(graph,
+                    model_params.hidden_to_wordvector_params, *in);
+            results.push_back(decoder_to_wordvector);
+        }
+        return results;
     }
 };
 
