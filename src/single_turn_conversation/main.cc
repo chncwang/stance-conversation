@@ -1068,20 +1068,23 @@ int main(int argc, const char *argv[]) {
                 analyze(result.second, total_word_ids, *metric);
                 unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
                 analyze(result.second, total_word_ids, *local_metric);
-
-//                if (local_metric->getAccuracy() < 1.0f) {
-//                    static int count_for_print;
-//                    if (++count_for_print % 100 == 0) {
-//                        count_for_print = 0;
-//                        int post_id = train_conversation_pairs.at(instance_index).post_id;
-//                        cout << "post:" << post_id << endl;
-//                        print(post_sentences.at(post_id));
-//                        cout << "golden answer:" << endl;
-//                        printWordIds(word_ids, model_params.lookup_table);
-//                        cout << "output:" << endl;
-//                        printWordIds(result.second, model_params.lookup_table);
-//                    }
-//                }
+                if (batch_i % 10 == 5) {
+                    int instance_index = getSentenceIndex(0);
+                    int post_id = train_conversation_pairs.at(instance_index).post_id;
+                    cout << "post:" << post_id << endl;
+                    print(post_sentences.at(post_id));
+                    cout << "golden answer:" << endl;
+                    int response_id = train_conversation_pairs.at(instance_index).response_id;
+                    vector<int> word_ids = toIds(response_sentences.at(response_id),
+                            model_params.lookup_table);
+                    printWordIds(word_ids, model_params.lookup_table);
+                    cout << "output:" << endl;
+                    vector<int> predicted;
+                    for (int i = 0; i < word_ids.size(); ++i) {
+                        predicted.push_back(result.second.at(i));
+                    }
+                    printWordIds(predicted, model_params.lookup_table);
+                }
                 if (batch_i % 10 == 5) {
 //                    cout << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
                     cout << "ppl:" << exp(smooth_log_ppl) << std::endl;
