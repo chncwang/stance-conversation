@@ -299,22 +299,15 @@ int countNgramDuplicate(const vector<int> &ids, int n) {
 //    return final_results;
 //}
 
-Node *embedding(Graph &graph, ModelParams &model_params, const string &word) {
-    using namespace n3ldg_plus;
-    Node *pretrained = embedding(graph, model_params.lookup_table, word);
-    Node *scratch = embedding(graph, model_params.lookup_table_scratch, word);
-    return concat(graph, {pretrained, scratch});
-}
-
-BatchedNode &embedding(Graph &graph, ModelParams &model_params, const vector<string> &words) {
-    BatchedNode *pretrained = n3ldg_plus::embedding(graph, model_params.lookup_table, words);
+Node *embedding(Graph &graph, ModelParams &model_params, const vector<string> &words) {
+    Node *pretrained = n3ldg_plus::embedding(graph, model_params.lookup_table, words);
     if (model_params.lookup_table.E.outDim() ==
             model_params.transformer_encoder_params.hiddenDim()) {
-        return *pretrained;
+        return pretrained;
     } else {
-        BatchedNode *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch,
+        Node *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch,
                 words);
-        return *n3ldg_plus::concatInBatch(graph, {pretrained, scratch});
+        return n3ldg_plus::concat(graph, {pretrained, scratch});
     }
 }
 
@@ -326,9 +319,9 @@ struct GraphBuilder {
             ModelParams &model_params,
             bool is_training) {
         using namespace n3ldg_plus;
-        BatchedNode &emb = embedding(graph, model_params, sentence);
+        Node *emb = embedding(graph, model_params, sentence);
         encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
-                emb, hyper_params.dropout, is_training);
+                *emb, sentence.size(), hyper_params.dropout, is_training);
         encoder_hiddens = layerNormalization(graph, model_params.enc_norm, *encoder_hiddens,
                 sentence.size());
     }
@@ -347,9 +340,9 @@ struct GraphBuilder {
         for (int i = 1; i < answer.size(); ++i) {
             words.push_back(answer.at(i - 1));
         }
-        BatchedNode &emb = embedding(graph, model_params, words);
+        Node *emb = embedding(graph, model_params, words);
 
-        decoder_components.decoder.forward(emb);
+        decoder_components.decoder.forward(*emb, answer.size());
 
         BatchedNode *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                 answer.size(), hyper_params, model_params);
