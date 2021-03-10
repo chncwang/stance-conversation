@@ -305,9 +305,8 @@ Node *embedding(Graph &graph, ModelParams &model_params, const vector<string> &w
             model_params.transformer_encoder_params.hiddenDim()) {
         return pretrained;
     } else {
-        Node *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch,
-                words);
-        return n3ldg_plus::concat(graph, {pretrained, scratch});
+        Node *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch, words);
+        return n3ldg_plus::concat(graph, {pretrained, scratch}, words.size());
     }
 }
 
@@ -338,6 +337,7 @@ struct GraphBuilder {
         vector<string> words;
         words.push_back(BEGIN_SYMBOL);
         for (int i = 1; i < answer.size(); ++i) {
+//            words.push_back(BEGIN_SYMBOL);
             words.push_back(answer.at(i - 1));
         }
         Node *emb = embedding(graph, model_params, words);
