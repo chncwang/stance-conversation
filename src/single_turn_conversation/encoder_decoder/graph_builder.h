@@ -337,27 +337,30 @@ struct GraphBuilder {
         vector<string> words;
         words.push_back(BEGIN_SYMBOL);
         for (int i = 1; i < answer.size(); ++i) {
-//            words.push_back(BEGIN_SYMBOL);
             words.push_back(answer.at(i - 1));
         }
         Node *emb = embedding(graph, model_params, words);
 
         decoder_components.decoder.forward(*emb, answer.size());
 
-        BatchedNode *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
+        Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                 answer.size(), hyper_params, model_params);
-//        BatchedNode *onehot_a = linearWordVector(graph, *decoder_to_wordvector,
-//                model_params.lookup_table.E, model_params.lookup_table.nVSize);
-        BatchedNode *onehot_a = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
-                    hyper_params.word_dim, 0), 
-                model_params.lookup_table.E, model_params.lookup_table.nVSize);
-        BatchedNode *onehot_b = linearWordVector(graph, *split(graph, *decoder_to_wordvector,
-                    hyper_params.hidden_dim - hyper_params.word_dim, hyper_params.word_dim),
-                model_params.lookup_table_scratch.E, model_params.lookup_table.nVSize);
-        BatchedNode *softmax = n3ldg_plus::softmax(graph, *addInBatch(graph, {onehot_a, onehot_b}),
-                1);
-//        BatchedNode *softmax = n3ldg_plus::softmax(graph, *onehot_a, 1);
-//        BatchedNode *softmax = n3ldg_plus::softmax(graph, *decoder_to_wordvector, 1);
+        Node *split_a = split(graph, *decoder_to_wordvector, hyper_params.word_dim, 0,
+                words.size());
+        Node *onehot_a = linear(graph, *split_a, model_params.lookup_table.E);
+        Node *split_b = split(graph, *decoder_to_wordvector,
+                hyper_params.hidden_dim - hyper_params.word_dim, hyper_params.word_dim,
+                words.size());
+        Node *onehot_b = linear(graph, *split_b, model_params.lookup_table_scratch.E);
+        Node *added = add(graph, {onehot_a, onehot_b});
+        vector<int> offsets;
+        for (int i = 0; i < words.size(); ++i) {
+            offsets.push_back(i * model_params.lookup_table.nVSize);
+        }
+        BatchedNode *batched_added = split(graph, *added, model_params.lookup_table.nVSize,
+                offsets);
+
+        BatchedNode *softmax = n3ldg_plus::softmax(graph, *batched_added, 1);
         decoder_components.wordvector_to_onehots = softmax->batch();
     }
 
