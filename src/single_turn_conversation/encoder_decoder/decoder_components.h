@@ -7,7 +7,7 @@
 #include "single_turn_conversation/encoder_decoder/hyper_params.h"
 
 struct DecoderComponents {
-    vector<Node *> wordvector_to_onehots;
+    Node *wordvector_to_onehots;
     n3ldg_plus::TransformerDecoderBuilder decoder;
 
     DecoderComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,

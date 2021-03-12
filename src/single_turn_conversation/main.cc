@@ -377,14 +377,15 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params, false);
             graph.compute();
-            vector<Node*> nodes = toNodePointers(decoder_components.wordvector_to_onehots);
+            Node *node = decoder_components.wordvector_to_onehots;
             vector<int> word_ids = transferVector<int, string>(
                     response_sentences.at(response_id), [&](const string &w) -> int {
                     return model_params.lookup_table.getElemId(w);
                     });
             int hit_count;
             vector<int> hit_flags;
-            float perplex = computePerplex(nodes, word_ids, hit_count, hit_flags, 5);
+            float perplex = computePerplex(*node, model_params.lookup_table.nVSize, word_ids,
+                    hit_count, hit_flags, 5);
             sum += perplex;
             hit_sum += hit_count;
             word_sum += word_ids.size();
@@ -1038,36 +1039,34 @@ int main(int argc, const char *argv[]) {
                 corpus_word_sum += word_sum;
 
                 vector<Node *> total_result_nodes;
-                vector<int> total_word_ids;
+                vector<vector<int>> total_word_ids;
 
                 for (int i = 0; i < batch_size; ++i) {
                     int instance_index = getSentenceIndex(i);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
                     vector<int> word_ids = toIds(response_sentences.at(response_id),
                             model_params.lookup_table);
-                    for (int id : word_ids) {
-                        total_word_ids.push_back(id);
-                    }
-                    vector<Node*> result_nodes =
-                        toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
-                    for (Node *node : result_nodes) {
-                        total_result_nodes.push_back(node);
-                    }
+                    total_word_ids.push_back(move(word_ids));
+                    Node *result_node = decoder_components_vector.at(i).wordvector_to_onehots;
+                    total_result_nodes.push_back(result_node);
                 }
-                auto result = maxLogProbabilityLoss(total_result_nodes, total_word_ids,
-                        1.0 / word_sum);
-                loss_sum += result.first * word_sum;
+
+                float loss = crossEntropyLoss(total_result_nodes, model_params.lookup_table.nVSize,
+                        total_word_ids, 1.0 / word_sum);
+                loss_sum += loss * word_sum;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
                     float p = max(1.0 / n, 0.0001);
-                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * result.first;
+                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * loss;
                 } else {
-                    smooth_log_ppl = result.first;
+                    smooth_log_ppl = loss;
                 }
 
-                analyze(result.second, total_word_ids, *metric);
-                unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
-                analyze(result.second, total_word_ids, *local_metric);
+                auto predicted_ids = predict(total_result_nodes, model_params.lookup_table.nVSize);
+                for (int i = 0; i < predicted_ids.size(); ++i) {
+                    analyze(predicted_ids.at(i), total_word_ids.at(i), *metric);
+                }
+
                 if (batch_i % 10 == 5) {
                     int instance_index = getSentenceIndex(0);
                     int post_id = train_conversation_pairs.at(instance_index).post_id;
@@ -1079,14 +1078,9 @@ int main(int argc, const char *argv[]) {
                             model_params.lookup_table);
                     printWordIds(word_ids, model_params.lookup_table);
                     cout << "output:" << endl;
-                    vector<int> predicted;
-                    for (int i = 0; i < word_ids.size(); ++i) {
-                        predicted.push_back(result.second.at(i));
-                    }
-                    printWordIds(predicted, model_params.lookup_table);
+                    printWordIds(predicted_ids.at(0), model_params.lookup_table);
                 }
                 if (batch_i % 10 == 5) {
-//                    cout << " ppl:" << exp(loss_sum / (corpus_word_sum)) << endl;
                     cout << "ppl:" << exp(smooth_log_ppl) << std::endl;
                     metric->print();
                 }
@@ -1114,9 +1108,10 @@ int main(int argc, const char *argv[]) {
 
                         vector<int> word_ids = toIds(response_sentences.at(
                                     conversation_pair.response_id), model_params.lookup_table);
-                        vector<Node*> result_nodes = toNodePointers(
-                                decoder_components.wordvector_to_onehots);
-                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 / word_sum).first;
+                        Node* result_node = decoder_components.wordvector_to_onehots;
+                        vector<Node *> nodes = {result_node};
+                        return crossEntropyLoss(nodes, model_params.lookup_table.nVSize,
+                                {word_ids}, 1.0 / word_sum);
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;

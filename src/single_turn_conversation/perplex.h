@@ -11,8 +11,7 @@
 
 #include "N3LDG.h"
 
-float computePerplex(const std::vector<Node *> &nodes, const std::vector<int> &answers,
-        int &hit_count,
+float computePerplex(const Node &node, int row, const std::vector<int> &answers, int &hit_count,
         vector<int> &hit_flags,
         int hit_beam) {
     if (hit_beam < 1) {
@@ -23,8 +22,12 @@ float computePerplex(const std::vector<Node *> &nodes, const std::vector<int> &a
     float count_sum = 0;
     hit_flags.clear();
 
-    for (int i = 0; i < nodes.size(); ++i) {
-        Node &node = *nodes.at(i);
+    int col = node.getDim() / row;
+    if (col * row != node.getDim()) {
+        cerr << boost::format("computePerplex col:%1% node dim:%2%\n") % col % node.getDim()
+            << endl;
+    }
+    for (int i = 0; i < col; ++i) {
         int answer = answers.at(i);
         if (answer < 0 || answer >= node.getDim()) {
             cerr << boost::format("answer:%1% dim:%2%") << answer << node.getDim() << endl;
@@ -33,13 +36,13 @@ float computePerplex(const std::vector<Node *> &nodes, const std::vector<int> &a
 #if USE_GPU
         node.val().copyFromDeviceToHost();
 #endif
-        float reciprocal_answer_prob = 1 / node.getVal()[answer];
+        float reciprocal_answer_prob = 1 / node.getVal()[row * i + answer];
         log_sum += log(reciprocal_answer_prob);
 
         bool hit = true;
         int larger_count = 0;
         for (int j = 0; j < node.getDim(); ++j) {
-            if (node.getVal()[j] >= node.getVal()[answer]) {
+            if (node.getVal()[row * i + j] >= node.getVal()[row * i + answer]) {
                 if (++larger_count > hit_beam) {
                     hit = false;
                     break;

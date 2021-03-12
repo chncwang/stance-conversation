@@ -353,15 +353,8 @@ struct GraphBuilder {
                 words.size());
         Node *onehot_b = linear(graph, *split_b, model_params.lookup_table_scratch.E);
         Node *added = add(graph, {onehot_a, onehot_b});
-        vector<int> offsets;
-        for (int i = 0; i < words.size(); ++i) {
-            offsets.push_back(i * model_params.lookup_table.nVSize);
-        }
-        BatchedNode *batched_added = split(graph, *added, model_params.lookup_table.nVSize,
-                offsets);
-
-        BatchedNode *softmax = n3ldg_plus::softmax(graph, *batched_added, 1);
-        decoder_components.wordvector_to_onehots = softmax->batch();
+        Node *softmax = n3ldg_plus::softmax(graph, *added, words.size());
+        decoder_components.wordvector_to_onehots = softmax;
     }
 
     void forwardDecoderByOneStep(Graph &graph, DecoderComponents &decoder_components, int i,
