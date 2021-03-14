@@ -41,7 +41,7 @@ float computePerplex(const Node &node, int row, const std::vector<int> &answers,
 
         bool hit = true;
         int larger_count = 0;
-        for (int j = 0; j < node.getDim(); ++j) {
+        for (int j = 0; j < row; ++j) {
             if (node.getVal()[row * i + j] >= node.getVal()[row * i + answer]) {
                 if (++larger_count > hit_beam) {
                     hit = false;

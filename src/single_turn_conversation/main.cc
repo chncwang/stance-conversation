@@ -146,13 +146,6 @@ DefaultConfig parseDefaultConfig(INIReader &ini_reader) {
 HyperParams parseHyperParams(INIReader &ini_reader) {
     HyperParams hyper_params;
 
-    int word_dim = ini_reader.GetInteger("hyper", "word_dim", 0);
-    if (word_dim <= 0) {
-        cerr << "word_dim wrong" << endl;
-        abort();
-    }
-    hyper_params.word_dim = word_dim;
-
     int encoding_hidden_dim = ini_reader.GetInteger("hyper", "hidden_dim", 0);
     if (encoding_hidden_dim <= 0) {
         cerr << "hidden_dim wrong" << endl;
@@ -217,12 +210,6 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
    	cerr << "word_cutoff read error" << endl;
     }
     hyper_params.word_cutoff = word_cutoff;
-
-    bool word_finetune = ini_reader.GetBoolean("hyper", "word_finetune", -1);
-    hyper_params.word_finetune = word_finetune;
-
-    string word_file = ini_reader.Get("hyper", "word_file", "");
-    hyper_params.word_file = word_file;
 
     float l2_reg = ini_reader.GetReal("hyper", "l2_reg", 0.0f);
     if (l2_reg < 0.0f || l2_reg > 1.0f) {
@@ -774,30 +761,6 @@ int main(int argc, const char *argv[]) {
                         conversation_pair.response_id);
                 addWord(word_counts, response_sentence);
             }
-
-            if (hyper_params.word_file != "" && !hyper_params.word_finetune) {
-                for (const PostAndResponses &dev : dev_post_and_responses){
-                    const vector<string>&post_sentence = post_sentences.at(dev.post_id);
-                    addWord(word_counts, post_sentence);
-
-                    for(int i=0; i<dev.response_ids.size(); i++){
-                        const vector<string>&resp_sentence = response_sentences.at(
-                                dev.response_ids.at(i));
-                        addWord(word_counts, resp_sentence);
-                    }
-                }
-
-                for (const PostAndResponses &test : test_post_and_responses){
-                    const vector<string>&post_sentence = post_sentences.at(test.post_id);
-                    addWord(word_counts, post_sentence);
-
-                    for(int i =0; i<test.response_ids.size(); i++){
-                        const vector<string>&resp_sentence =
-                            response_sentences.at(test.response_ids.at(i));
-                        addWord(word_counts, resp_sentence);
-                    }
-                }
-            }
         };
         wordStat();
         word_counts[unknownkey] = 1000000000;
@@ -826,27 +789,14 @@ int main(int argc, const char *argv[]) {
             const HyperParams &hyper_params,
             ModelParams &model_params,
             const Alphabet *alphabet) {
-        cout << format("allocate word_file:%1%\n") % hyper_params.word_file;
         if (alphabet != nullptr) {
-            if(hyper_params.word_file != "" &&
-                    default_config.program_mode == ProgramMode::TRAINING &&
-                    default_config.input_model_file == "") {
-                model_params.lookup_table.init(*alphabet, hyper_params.word_file,
-                        hyper_params.word_finetune);
-            } else {
-                model_params.lookup_table.init(*alphabet, hyper_params.word_dim, true);
-            }
-            if (hyper_params.hidden_dim > hyper_params.word_dim) {
-                model_params.lookup_table_scratch.init(*alphabet,
-                        hyper_params.hidden_dim - hyper_params.word_dim, true);
-            }
+            model_params.lookup_table.init(*alphabet, hyper_params.hidden_dim, true);
         }
         model_params.transformer_encoder_params.init(hyper_params.hidden_layer,
                 hyper_params.hidden_dim, hyper_params.head_count, 512);
         model_params.decoder_params.init(hyper_params.hidden_layer, hyper_params.hidden_dim,
                 hyper_params.head_count, 512);
         model_params.hidden_to_wordvector_params.init(
-//                model_params.lookup_table.nVSize,
                 hyper_params.hidden_dim,
                 hyper_params.hidden_dim,
                 false);
@@ -1150,23 +1100,8 @@ int main(int argc, const char *argv[]) {
             cout << "dev ppl:" << perplex << endl;
 
             cout << "loss_sum:" << loss_sum << " last_loss_sum:" << endl;
-            if (loss_sum > last_loss_sum) {
-                if (epoch == 0) {
-                    cerr << "loss is larger than last epoch but epoch is 0" << endl;
-                    abort();
-                }
-                model_update._alpha *= 0.1f;
-                hyper_params.learning_rate = model_update._alpha;
-                cout << "learning_rate decay:" << model_update._alpha << endl;
-                std::shared_ptr<Json::Value> root = loadModel(last_saved_model);
-                model_params.fromJson((*root)["model_params"]);
-#if USE_GPU
-                model_params.copyFromHostToDevice();
-#endif
-            } else {
-                last_saved_model = saveModel(hyper_params, model_params,
-                        default_config.output_model_file_prefix, epoch);
-            }
+            last_saved_model = saveModel(hyper_params, model_params,
+                    default_config.output_model_file_prefix, epoch);
 
             last_loss_sum = loss_sum;
             loss_sum = 0;

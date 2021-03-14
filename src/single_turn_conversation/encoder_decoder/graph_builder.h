@@ -300,14 +300,7 @@ int countNgramDuplicate(const vector<int> &ids, int n) {
 //}
 
 Node *embedding(Graph &graph, ModelParams &model_params, const vector<string> &words) {
-    Node *pretrained = n3ldg_plus::embedding(graph, model_params.lookup_table, words);
-    if (model_params.lookup_table.E.outDim() ==
-            model_params.transformer_encoder_params.hiddenDim()) {
-        return pretrained;
-    } else {
-        Node *scratch = n3ldg_plus::embedding(graph, model_params.lookup_table_scratch, words);
-        return n3ldg_plus::concat(graph, {pretrained, scratch}, words.size());
-    }
+    return n3ldg_plus::embedding(graph, model_params.lookup_table, words);
 }
 
 struct GraphBuilder {
@@ -345,15 +338,8 @@ struct GraphBuilder {
 
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                 answer.size(), hyper_params, model_params);
-        Node *split_a = split(graph, *decoder_to_wordvector, hyper_params.word_dim, 0,
-                words.size());
-        Node *onehot_a = linear(graph, *split_a, model_params.lookup_table.E);
-        Node *split_b = split(graph, *decoder_to_wordvector,
-                hyper_params.hidden_dim - hyper_params.word_dim, hyper_params.word_dim,
-                words.size());
-        Node *onehot_b = linear(graph, *split_b, model_params.lookup_table_scratch.E);
-        Node *added = add(graph, {onehot_a, onehot_b});
-        Node *softmax = n3ldg_plus::softmax(graph, *added, words.size());
+        Node *onehot = linear(graph, *decoder_to_wordvector, model_params.lookup_table.E);
+        Node *softmax = n3ldg_plus::softmax(graph, *onehot, words.size());
         decoder_components.wordvector_to_onehots = softmax;
     }
 

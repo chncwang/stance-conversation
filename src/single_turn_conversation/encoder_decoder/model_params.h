@@ -12,7 +12,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 #endif
 {
     LookupTable<Param> lookup_table;
-    LookupTable<Param> lookup_table_scratch;
     UniParams hidden_to_wordvector_params;
     TransformerEncoderParams transformer_encoder_params;
     LayerNormalizationParams enc_norm;
@@ -27,7 +26,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
     Json::Value toJson() const override {
         Json::Value json;
         json["lookup_table"] = lookup_table.toJson();
-        json["lookup_table_scratch"] = lookup_table_scratch.toJson();
         json["hidden_to_wordvector_params"] = hidden_to_wordvector_params.toJson();
         json["transformer_encoder_params"] = transformer_encoder_params.toJson();
         json["enc_norm"] = enc_norm.toJson();
@@ -38,7 +36,6 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 
     void fromJson(const Json::Value &json) override {
         lookup_table.fromJson(json["lookup_table"]);
-        lookup_table_scratch.fromJson(json["lookup_table_scratch"]);
         hidden_to_wordvector_params.fromJson(json["hidden_to_wordvector_params"]);
         transformer_encoder_params.fromJson(json["transformer_encoder_params"]);
         enc_norm.fromJson(json["enc_norm"]);
@@ -48,16 +45,15 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&lookup_table, &lookup_table_scratch, &hidden_to_wordvector_params,
-            &transformer_encoder_params, &enc_norm, &dec_norm, &decoder_params};
+        return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
+            &enc_norm, &dec_norm, &decoder_params};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&lookup_table, &lookup_table_scratch,
-            &hidden_to_wordvector_params, &transformer_encoder_params, &enc_norm, &dec_norm,
-            &decoder_params};
+        return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
+            &enc_norm, &dec_norm, &decoder_params};
     }
 };
 
