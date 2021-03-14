@@ -34,7 +34,7 @@ float computePerplex(const Node &node, int row, const std::vector<int> &answers,
             abort();
         }
 #if USE_GPU
-        node.val().copyFromDeviceToHost();
+        const_cast<Node &>(node).val().copyFromDeviceToHost();
 #endif
         float reciprocal_answer_prob = 1 / node.getVal()[row * i + answer];
         log_sum += log(reciprocal_answer_prob);
