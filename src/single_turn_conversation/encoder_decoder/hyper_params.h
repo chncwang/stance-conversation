@@ -62,6 +62,12 @@ struct HyperParams : public N3LDGSerializable {
         optimizer = static_cast<Optimizer>(json["optimizer"].asInt());
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(hidden_dim, hidden_layer, head_count, dropout, batch_size, beam_size, learning_rate,
+                lr_decay, warm_up_iterations, word_cutoff, l2_reg, optimizer);
+    }
+
     void print() const {
         std::cout << "hidden_dim:" << hidden_dim << std::endl
             << "hidden_layer:" << hidden_layer << std::endl

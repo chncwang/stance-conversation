@@ -277,59 +277,45 @@ string saveModel(const HyperParams &hyper_params, ModelParams &model_params,
     model_params.copyFromDeviceToHost();
 #endif
 
-    Json::Value root;
-    root["hyper_params"] = hyper_params.toJson();
-    root["model_params"] = model_params.toJson();
-    root["epoch"] = epoch;
-    Json::StreamWriterBuilder builder;
-    builder["commentStyle"] = "None";
-    builder["indentation"] = "";
-    unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    ofstream out(filename);
-    writer->write(root, &out);
+//    Json::Value root;
+//    root["hyper_params"] = hyper_params.toJson();
+//    root["model_params"] = model_params.toJson();
+//    root["epoch"] = epoch;
+//    Json::StreamWriterBuilder builder;
+//    builder["commentStyle"] = "None";
+//    builder["indentation"] = "";
+//    unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    ofstream out(filename, ios::binary);
+    cereal::BinaryOutputArchive output_ar(out);
+    output_ar(hyper_params, model_params, epoch);
+//    writer->write(root, &out);
     out.close();
     cout << format("model file %1% saved") % filename << endl;
     return filename;
 }
 
-shared_ptr<Json::Value> loadModel(const string &filename) {
+void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
+        ModelParams &model_params,
+        int &epoch,
+        const string &filename,
+        const function<void(const DefaultConfig &default_config, const HyperParams &hyper_params,
+            ModelParams &model_params, const Alphabet*)> &allocate_model_params) {
     ifstream is(filename.c_str());
-    shared_ptr<Json::Value> root(new Json::Value);
     if (is) {
         cout << "loading model..." << endl;
-        stringstream sstr;
-        sstr << is.rdbuf();
-        string str = sstr.str();
-        Json::CharReaderBuilder builder;
-        auto reader = unique_ptr<Json::CharReader>(builder.newCharReader());
-        string error;
-        if (!reader->parse(str.c_str(), str.c_str() + str.size(), root.get(), &error)) {
-            cerr << boost::format("parse json error:%1%") % error << endl;
-            abort();
-        }
+        cereal::BinaryInputArchive in_ar(is);
+        in_ar(hyper_params);
+        hyper_params.print();
+        allocate_model_params(default_config, hyper_params, model_params, nullptr);
+        in_ar(model_params, epoch);
+#if USE_GPU
+        model_params.copyFromHostToDevice();
+#endif
         cout << "model loaded" << endl;
     } else {
         cerr << format("failed to open is, error when loading %1%") % filename << endl;
         abort();
     }
-
-    return root;
-}
-
-void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
-        ModelParams &model_params,
-        int &epoch,
-        const Json::Value *root,
-        const function<void(const DefaultConfig &default_config, const HyperParams &hyper_params,
-            ModelParams &model_params, const Alphabet*)> &allocate_model_params) {
-    hyper_params.fromJson((*root)["hyper_params"]);
-    epoch = (*root)["epoch"].asInt();
-    hyper_params.print();
-    allocate_model_params(default_config, hyper_params, model_params, nullptr);
-    model_params.fromJson((*root)["model_params"]);
-#if USE_GPU
-    model_params.copyFromHostToDevice();
-#endif
 }
 
 float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
@@ -632,7 +618,7 @@ void preserveVector(vector<T> &vec, int count, int seed) {
     vec.erase(vec.begin() + std::min<int>(count, vec.size()), vec.end());
 }
 
-unordered_map<string, float> calculateIdf(const vector<vector<string>> sentences) {
+unordered_map<string, float> calculateIdf(const vector<vector<string>> &sentences) {
     cout << "sentences size:" << sentences.size() << endl;
     unordered_map<string, int> doc_counts;
     int i = 0;
@@ -767,19 +753,6 @@ int main(int argc, const char *argv[]) {
         word_counts[BEGIN_SYMBOL] = 1000000000;
         alphabet.init(word_counts, hyper_params.word_cutoff);
         cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
-    } else if (default_config.split_unknown_words) {
-        root_ptr = loadModel(default_config.input_model_file);
-        Json::Value &root = *root_ptr;
-        vector<string> words = stringVectorFromJson(
-                root["model_params"]["lookup_table"]["word_ids"]["m_id_to_string"]);
-        unordered_set<string> word_set = knownWords(words);
-        auto &v = default_config.program_mode == ProgramMode::METRIC ? dev_post_and_responses :
-            test_post_and_responses;
-        auto post_ids_and_response_ids = PostAndResponseIds(v);
-        post_sentences = reprocessSentences(post_sentences, word_set,
-                post_ids_and_response_ids.first);
-        response_sentences = reprocessSentences(response_sentences, word_set,
-                post_ids_and_response_ids.second);
     }
 
     ModelParams model_params;
@@ -809,9 +782,8 @@ int main(int argc, const char *argv[]) {
         if (default_config.input_model_file == "") {
             allocate_model_params(default_config, hyper_params, model_params, &alphabet);
         } else {
-            root_ptr = loadModel(default_config.input_model_file);
-            loadModel(default_config, hyper_params, model_params, saved_epoch, root_ptr.get(),
-                    allocate_model_params);
+            loadModel(default_config, hyper_params, model_params, saved_epoch,
+                    default_config.input_model_file, allocate_model_params);
             hyper_params.learning_rate = ini_reader.GetFloat("hyper", "learning_rate",
                     0);
             hyper_params.batch_size = ini_reader.GetFloat("hyper", "batch_size", 1);
@@ -855,8 +827,7 @@ int main(int argc, const char *argv[]) {
         for(const string &model_file_path : ordered_file_paths) {
             cout << format("model_file_path:%1%") % model_file_path << endl;
             ModelParams model_params;
-            shared_ptr<Json::Value> root_ptr = loadModel(model_file_path);
-            loadModel(default_config, hyper_params, model_params, saved_epoch, root_ptr.get(),
+            loadModel(default_config, hyper_params, model_params, saved_epoch, model_file_path,
                     allocate_model_params);
             float perplex = metricTestPosts(hyper_params, model_params,
                     dev_post_and_responses, post_sentences, response_sentences);

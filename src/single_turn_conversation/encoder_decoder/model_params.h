@@ -43,6 +43,12 @@ struct ModelParams : public N3LDGSerializable, public TunableCombination<BasePar
         decoder_params.fromJson(json["decoder_params"]);
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(lookup_table, hidden_to_wordvector_params, transformer_encoder_params, enc_norm,
+                dec_norm, decoder_params);
+    }
+
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
