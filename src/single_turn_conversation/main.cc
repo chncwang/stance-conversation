@@ -900,9 +900,13 @@ int main(int argc, const char *argv[]) {
 
             float smooth_log_ppl = -1;
 
+            std::chrono::time_point<std::chrono::high_resolution_clock> last_time_record;
+            std::chrono::time_point<std::chrono::high_resolution_clock> time_record;
+
             for (int batch_i = 0; batch_i < batch_count + (train_conversation_pairs.size() >
                         hyper_params.batch_size * batch_count); ++batch_i) {
-//                if (batch_i > 10000) exit(0);
+                last_time_record = move(time_record);
+                time_record = high_resolution_clock::now();
                 if (iteration < hyper_params.warm_up_iterations) {
                     model_update._alpha = hyper_params.learning_rate;
                 } else {
@@ -912,7 +916,6 @@ int main(int argc, const char *argv[]) {
                 if (batch_i % 10 == 5) {
                     cout << "learning rate:" << model_update._alpha << endl;
                 }
-                auto start = high_resolution_clock::now();
                 if (batch_i % 10 == 5) {
                     cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
                 }
@@ -1051,11 +1054,13 @@ int main(int argc, const char *argv[]) {
                     cerr << "no optimzer set" << endl;
                     abort();
                 }
-                auto stop = high_resolution_clock::now();
-                auto duration = duration_cast<milliseconds>(stop - start);
-                duration_count = 0.9 * duration_count + 0.1 * duration.count();
-                if (batch_i % 10 == 5) {
-                    cout << "duration:" << duration_count << endl;
+
+                if (batch_i > 10) {
+                    auto duration = duration_cast<milliseconds>(time_record - last_time_record);
+                    duration_count = 0.99 * duration_count + 0.01 * duration.count();
+                    if (batch_i % 10 == 5) {
+                        cout << "duration:" << duration_count << endl;
+                    }
                 }
 
                 if (default_config.save_model_per_batch) {
