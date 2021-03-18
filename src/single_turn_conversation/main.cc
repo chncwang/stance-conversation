@@ -893,7 +893,7 @@ int main(int argc, const char *argv[]) {
 
             unique_ptr<Metric> metric = unique_ptr<Metric>(new Metric);
             using namespace std::chrono;
-            int duration_count = 1e3;
+            int duration_count = 0;
 
             int corpus_word_sum = 0;
             cout << "calculated warmup:" << hyper_params.warm_up_iterations << endl;
@@ -1057,7 +1057,8 @@ int main(int argc, const char *argv[]) {
 
                 if (batch_i > 10) {
                     auto duration = duration_cast<milliseconds>(time_record - last_time_record);
-                    duration_count = 0.99 * duration_count + 0.01 * duration.count();
+                    duration_count = (duration_count * (batch_i - 10) +  duration.count()) /
+                        (batch_i - 9);
                     if (batch_i % 10 == 5) {
                         cout << "duration:" << duration_count << endl;
                     }
