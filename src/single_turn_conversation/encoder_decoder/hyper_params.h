@@ -29,6 +29,7 @@ struct HyperParams : public N3LDGSerializable {
     int word_cutoff;
     float l2_reg;
     Optimizer optimizer;
+    string word_file;
 
     Json::Value toJson() const override {
         Json::Value json;
@@ -80,6 +81,7 @@ struct HyperParams : public N3LDGSerializable {
             << "warm_up_iterations:" << warm_up_iterations << std::endl
 	    << "word_cutoff:" << word_cutoff << std::endl
     	    << "l2_reg:" << l2_reg << std::endl
+    	    << "word_file:" << word_file << std::endl
     	    << "optimizer:" << optimizer << std::endl; 
     }
 };
