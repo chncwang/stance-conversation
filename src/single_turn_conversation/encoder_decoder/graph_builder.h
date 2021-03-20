@@ -494,9 +494,9 @@ struct GraphBuilder {
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
                 model_params, i);
         decoder_components.decoder_to_wordvectors.push_back(decoder_to_wordvector);
-        Node *wordvector_to_onehot = linearWordVector(graph, model_params.lookup_table.nVSize,
-                model_params.lookup_table.E, *decoder_to_wordvector);
-        Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot);
+        Node *wordvector_to_onehot = linear(graph, *decoder_to_wordvector,
+                model_params.lookup_table.E);
+        Node *softmax = n3ldg_plus::softmax(graph, *wordvector_to_onehot, 1);
         decoder_components.wordvector_to_onehots.push_back(softmax);
     }
 

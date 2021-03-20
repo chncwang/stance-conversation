@@ -1012,15 +1012,21 @@ int main(int argc, const char *argv[]) {
                             model_params.lookup_table);
                     vector<Node*> result_nodes =
                         toNodePointers(decoder_components_vector.at(i).wordvector_to_onehots);
-                    auto result = maxLogProbabilityLoss(result_nodes, word_ids,
-                            1.0 / word_sum);
-                    loss_sum += result.first;
+                    vector<vector<int>> ids;
+                    for (int id : word_ids) {
+                        ids.push_back({id});
+                    }
+                    auto loss = crossEntropyLoss(result_nodes, result_nodes.front()->getDim(),
+                            ids, 1.0 / word_sum);
+                    loss_sum += loss;
+                    auto predicted_ids = predict(result_nodes, result_nodes.front()->getDim());
+                    vector<int> final_predicted_ids;
+                    for (const auto &it : predicted_ids) {
+                        final_predicted_ids.push_back(it.front());
+                    }
+                    analyze(final_predicted_ids, word_ids, *metric);
 
-                    analyze(result.second, word_ids, *metric);
-                    unique_ptr<Metric> local_metric(unique_ptr<Metric>(new Metric));
-                    analyze(result.second, word_ids, *local_metric);
-
-                    if (local_metric->getAccuracy() < 1.0f) {
+                    {
                         static int count_for_print;
                         if (++count_for_print % 100 == 0) {
                             count_for_print = 0;
@@ -1034,7 +1040,7 @@ int main(int argc, const char *argv[]) {
                             cout << "golden answer:" << endl;
                             printWordIds(word_ids, model_params.lookup_table);
                             cout << "output:" << endl;
-                            printWordIds(result.second, model_params.lookup_table);
+                            printWordIds(final_predicted_ids, model_params.lookup_table);
                         }
                     }
                 }
@@ -1062,8 +1068,8 @@ int main(int argc, const char *argv[]) {
                                     conversation_pair.response_id), model_params.lookup_table);
                         vector<Node*> result_nodes = toNodePointers(
                                 decoder_components.wordvector_to_onehots);
-                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 /
-                                word_ids.size()).first;
+//                        return maxLogProbabilityLoss(result_nodes, word_ids, 1.0 /
+//                                word_ids.size()).first;
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;

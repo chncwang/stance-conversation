@@ -43,8 +43,8 @@ struct DecoderComponents {
                 static_cast<Node*>(decoder_lookups.at(i - 1))};
         Node *concat_node = concat(graph, concat_inputs);
 
-        Node *decoder_to_wordvector = n3ldg_plus::linear(graph,
-                model_params.hidden_to_wordvector_params, *concat_node);
+        Node *decoder_to_wordvector = n3ldg_plus::linear(graph, *concat_node,
+                model_params.hidden_to_wordvector_params);
         return decoder_to_wordvector;
     }
 };
