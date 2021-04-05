@@ -4,15 +4,17 @@
 #include <fstream>
 #include <iostream>
 
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 
-struct ModelParams : public N3LDGSerializable, public TunableCombination<BaseParam>
+using namespace ::n3ldg_plus;
+
+struct ModelParams : public Serializable, public TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents
 #endif
 {
     LookupTable<Param> lookup_table;
-    UniParams hidden_to_wordvector_params;
+    LinearParam hidden_to_wordvector_params;
     TransformerEncoderParams transformer_encoder_params;
     LayerNormalizationParams enc_norm;
     LayerNormalizationParams dec_norm;

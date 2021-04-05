@@ -22,7 +22,7 @@
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/range/iterator_range.hpp>
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 #include "single_turn_conversation/data_manager.h"
 #include "single_turn_conversation/def.h"
 #include "single_turn_conversation/bleu.h"
@@ -337,7 +337,7 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
                     *graph_builder.encoder_hiddens, src_sentence_len, hyper_params.dropout, false);
             graph_builder.forwardDecoder(graph, decoder_components,
                     response_sentences.at(response_id), hyper_params, model_params, false);
-            graph.compute();
+            graph.forward();
             Node *node = decoder_components.wordvector_to_onehots;
             vector<int> word_ids = transferVector<int, string>(
                     response_sentences.at(response_id), [&](const string &w) -> int {
@@ -942,7 +942,7 @@ int main(int argc, const char *argv[]) {
                 }
                 profiler.EndCudaEvent();
 
-                graph.compute();
+                graph.forward();
 
                 int word_sum = 0;
                 for (int i = 0; i < batch_size; ++i) {

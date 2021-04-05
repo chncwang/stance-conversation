@@ -2,13 +2,15 @@
 #define SINGLE_TURN_CONVERSATION_SRC_ENCODER_DECODER_DECODER_COMPONENTS_H
 
 #include <memory>
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 #include "single_turn_conversation/encoder_decoder/model_params.h"
 #include "single_turn_conversation/encoder_decoder/hyper_params.h"
 
+using namespace n3ldg_plus;
+
 struct DecoderComponents {
     Node *wordvector_to_onehots;
-    n3ldg_plus::TransformerDecoderBuilder decoder;
+    TransformerDecoderBuilder decoder;
 
     DecoderComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,
             int src_sentence_len, dtype dropout, bool is_training) : decoder(graph, params,

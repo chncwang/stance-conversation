@@ -9,7 +9,7 @@
 #include <iostream>
 #include <boost/format.hpp>
 
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 
 float computePerplex(const Node &node, int row, const std::vector<int> &answers, int &hit_count,
         vector<int> &hit_flags,

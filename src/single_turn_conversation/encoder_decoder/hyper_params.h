@@ -6,9 +6,10 @@
 #include <cmath>
 #include <boost/format.hpp>
 #include <string>
-#include "serializable.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 
 using std::string;
+using namespace ::n3ldg_plus;
 
 enum Optimizer {
     ADAM = 0,
@@ -16,7 +17,7 @@ enum Optimizer {
     ADAMW = 2
 };
 
-struct HyperParams : public N3LDGSerializable {
+struct HyperParams : public Serializable {
     int hidden_dim;
     int hidden_layer;
     int head_count;

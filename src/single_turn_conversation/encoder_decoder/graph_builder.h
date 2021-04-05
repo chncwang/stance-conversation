@@ -11,7 +11,7 @@
 #include <queue>
 #include <algorithm>
 #include <boost/format.hpp>
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 #include "tinyutf8.h"
 #include "model_params.h"
 #include "hyper_params.h"
@@ -300,7 +300,7 @@ struct GraphBuilder {
         }
         Node *emb = embedding(graph, model_params, words);
 
-        decoder_components.decoder.forward(*emb, answer.size());
+        decoder_components.decoder.connect(*emb, answer.size());
 
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
                 answer.size(), hyper_params, model_params);
@@ -315,7 +315,7 @@ struct GraphBuilder {
             ModelParams &model_params) {
         using namespace n3ldg_plus;
         Node *emb = embedding(graph, model_params.lookup_table, answer);
-        decoder_components.decoder.forward(*emb);
+        decoder_components.decoder.connect(*emb);
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
                 model_params);
         Node *onehot = linear(graph, *decoder_to_wordvector, model_params.lookup_table.E);
@@ -401,7 +401,7 @@ struct GraphBuilder {
                     }
                 }
 
-                graph.compute();
+                graph.forward();
             }
         }
 
