@@ -17,7 +17,7 @@
 #include "conversation_structure.h"
 #include "print.h"
 #include "tinyutf8.h"
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 
 using namespace std;
 

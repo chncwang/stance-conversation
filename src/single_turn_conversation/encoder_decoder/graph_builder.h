@@ -11,7 +11,7 @@
 #include <queue>
 #include <algorithm>
 #include <boost/format.hpp>
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 #include "tinyutf8.h"
 #include "model_params.h"
 #include "hyper_params.h"

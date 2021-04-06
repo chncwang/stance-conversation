@@ -22,7 +22,7 @@
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/range/iterator_range.hpp>
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 #include "single_turn_conversation/data_manager.h"
 #include "single_turn_conversation/def.h"
 #include "single_turn_conversation/bleu.h"
@@ -195,8 +195,12 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     }
     hyper_params.learning_rate = learning_rate;
 
-    float lr_decay = ini_reader.GetBoolean("hyper", "lr_decay", false);
-    hyper_params.lr_decay = lr_decay;
+    float clip_grad = ini_reader.GetReal("hyper", "clip_grad", 1e10);
+    if (clip_grad <= 0.0f) {
+        cerr << "clip_grad wrong" << endl;
+        abort();
+    }
+    hyper_params.clip_grad = clip_grad;
 
     int warm_up_iterations = ini_reader.GetInteger("hyper", "warm_up_iterations", 4000);
     if (warm_up_iterations < 0) {
@@ -967,12 +971,12 @@ int main(int argc, const char *argv[]) {
                 }
 
                 float loss = crossEntropyLoss(total_result_nodes, model_params.lookup_table.nVSize,
-                        total_word_ids, 1.0 / word_sum);
-                loss_sum += loss * word_sum;
+                        total_word_ids, 1.0);
+                loss_sum += loss;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
                     float p = max(1.0 / n, 0.0001);
-                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * loss;
+                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * loss / word_sum; 
                 } else {
                     smooth_log_ppl = loss;
                 }
@@ -1036,11 +1040,23 @@ int main(int argc, const char *argv[]) {
 #endif
 
                 if (hyper_params.optimizer == Optimizer::ADAM) {
-                    model_update.updateAdam(10.0f);
+                    if (hyper_params.clip_grad > 1e5) {
+                        model_update.updateAdam();
+                    } else {
+                        model_update.updateAdam(10.0f);
+                    }
                 } else if (hyper_params.optimizer == Optimizer::ADAGRAD) {
-                    model_update.update(10.0f);
+                    if (hyper_params.clip_grad > 1e5) {
+                        model_update.update();
+                    } else {
+                        model_update.update(11.0f);
+                    }
                 } else if (hyper_params.optimizer == Optimizer::ADAMW) {
-                    model_update.updateAdamW(10.0f);
+                    if (hyper_params.clip_grad > 1e5) {
+                        model_update.updateAdamW();
+                    } else {
+                        model_update.updateAdamW(10.0f);
+                    }
                 } else {
                     cerr << "no optimzer set" << endl;
                     abort();

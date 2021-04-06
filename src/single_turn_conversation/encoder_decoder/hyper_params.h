@@ -6,7 +6,6 @@
 #include <cmath>
 #include <boost/format.hpp>
 #include <string>
-#include "serializable.h"
 
 using std::string;
 
@@ -24,7 +23,7 @@ struct HyperParams : public N3LDGSerializable {
     int batch_size;
     int beam_size;
     float learning_rate;
-    bool lr_decay;
+    float clip_grad;
     int warm_up_iterations;
     int word_cutoff;
     float l2_reg;
@@ -40,7 +39,7 @@ struct HyperParams : public N3LDGSerializable {
         json["batch_size"] = batch_size;
         json["beam_size"] = beam_size;
         json["learning_rate"] = learning_rate;
-        json["lr_decay"] = lr_decay;
+        json["clip_grad"] = clip_grad;
         json["warm_up_iterations"] = warm_up_iterations;
         json["word_cutoff"] = word_cutoff;
         json["l2_reg"] = l2_reg;
@@ -56,7 +55,7 @@ struct HyperParams : public N3LDGSerializable {
         batch_size = json["batch_size"].asInt();
         beam_size = json["beam_size"].asInt();
         learning_rate = json["learning_rate"].asFloat();
-        lr_decay = json["lr_decay"].asBool();
+        clip_grad = json["clip_grad"].asFloat();
         warm_up_iterations = json["warm_up_iterations"].asInt();
         word_cutoff = json["word_cutoff"].asInt();
         l2_reg = json["l2_reg"].asFloat();
@@ -66,7 +65,7 @@ struct HyperParams : public N3LDGSerializable {
     template<typename Archive>
     void serialize(Archive &ar) {
         ar(hidden_dim, hidden_layer, head_count, dropout, batch_size, beam_size, learning_rate,
-                lr_decay, warm_up_iterations, word_cutoff, l2_reg, optimizer);
+                clip_grad, warm_up_iterations, word_cutoff, l2_reg, optimizer);
     }
 
     void print() const {
@@ -77,7 +76,7 @@ struct HyperParams : public N3LDGSerializable {
             << "batch_size:" << batch_size << std::endl
             << "beam_size:" << beam_size << std::endl
             << "learning_rate:" << learning_rate << std::endl
-            << "lr_decay:" << lr_decay << std::endl
+            << "clip_grad:" << clip_grad << std::endl
             << "warm_up_iterations:" << warm_up_iterations << std::endl
 	    << "word_cutoff:" << word_cutoff << std::endl
     	    << "l2_reg:" << l2_reg << std::endl

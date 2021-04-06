@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "N3LDG.h"
+#include "n3ldg-plus/n3ldg-plus.h"
 
 struct ModelParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
