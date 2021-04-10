@@ -223,11 +223,11 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
 
     string optimizer = ini_reader.Get("hyper", "optimzer", "");
     if (optimizer == "adam") {
-        hyper_params.optimizer = Optimizer::ADAM;
+        hyper_params.optimizer = ::Optimizer::ADAM;
     } else if (optimizer == "adagrad") {
-        hyper_params.optimizer = Optimizer::ADAGRAD;
+        hyper_params.optimizer = ::Optimizer::ADAGRAD;
     } else if (optimizer == "adamw") {
-        hyper_params.optimizer = Optimizer::ADAMW;
+        hyper_params.optimizer = ::Optimizer::ADAMW;
     } else {
         cerr << "invalid optimzer:" << optimizer << endl;
         abort();
@@ -678,7 +678,7 @@ int main(int argc, const char *argv[]) {
 #endif
 
 #if USE_GPU
-    n3ldg_cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
+    cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
 #endif
 
     HyperParams hyper_params = parseHyperParams(ini_reader);
@@ -726,7 +726,6 @@ int main(int argc, const char *argv[]) {
     auto all_idf = calculateIdf(all_sentences);
 
     Alphabet alphabet;
-    shared_ptr<Json::Value> root_ptr;
     unordered_map<string, int> word_counts;
     if (default_config.program_mode == ProgramMode::TRAINING) {
         auto wordStat = [&]() {
@@ -740,7 +739,7 @@ int main(int argc, const char *argv[]) {
             }
         };
         wordStat();
-        word_counts[unknownkey] = 1000000000;
+        word_counts[n3ldg_plus::UNKNOWN_WORD] = 1000000000;
         word_counts[BEGIN_SYMBOL] = 1000000000;
         alphabet.init(word_counts, hyper_params.word_cutoff);
         cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
@@ -830,10 +829,17 @@ int main(int argc, const char *argv[]) {
             }
         }
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
-        ModelUpdate model_update;
-        model_update._alpha = hyper_params.learning_rate;
-        model_update._reg = hyper_params.l2_reg;
-        model_update.setParams(model_params.tunableParams());
+        n3ldg_plus::Optimizer *optimizer;
+        if (hyper_params.optimizer == ::Optimizer::ADAM) {
+            optimizer = new n3ldg_plus::AdamOptimzer(model_params.tunableParams(),
+                    hyper_params.learning_rate, 0.9, 0.999, 1e-8, hyper_params.l2_reg);
+        } else if (hyper_params.optimizer == ::Optimizer::ADAMW) {
+            optimizer = new n3ldg_plus::AdamWOptimzer(model_params.tunableParams(),
+                    hyper_params.learning_rate, 0.9, 0.999, 1e-8, hyper_params.l2_reg);
+        } else {
+            cerr << "no optimzer set" << endl;
+            abort();
+        }
 
 #if USE_DOUBLE
         CheckGrad grad_checker;
@@ -843,19 +849,10 @@ int main(int argc, const char *argv[]) {
         dtype last_loss_sum = 1e10f;
         dtype loss_sum = 0.0f;
 
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.SetEnabled(false);
-        profiler.BeginEvent("total");
-
         string last_saved_model;
 
         for (int epoch = saved_epoch + 1; epoch < default_config.max_epoch; ++epoch) {
             cout << "epoch:" << epoch << endl;
-
-            float lr = hyper_params.learning_rate;
-            model_update._alpha = lr;
-
-            model_params.lookup_table.E.is_fixed = false;
 
             auto cmp = [&] (const ConversationPair &a, const ConversationPair &b)->bool {
                 auto len = [&] (const ConversationPair &pair)->int {
@@ -899,13 +896,14 @@ int main(int argc, const char *argv[]) {
                 last_time_record = move(time_record);
                 time_record = high_resolution_clock::now();
                 if (iteration < hyper_params.warm_up_iterations) {
-                    model_update._alpha = hyper_params.learning_rate;
+                    optimizer->setLearningRate(hyper_params.learning_rate);
                 } else {
-                    model_update._alpha = hyper_params.learning_rate *
+                    dtype decayed_lr = hyper_params.learning_rate *
                         sqrt(hyper_params.warm_up_iterations) / sqrt(iteration);
+                    optimizer->setLearningRate(decayed_lr);
                 }
                 if (batch_i % 10 == 5) {
-                    cout << "learning rate:" << model_update._alpha << endl;
+                    cout << "learning rate:" << optimizer->getLearningRate() << endl;
                 }
                 if (batch_i % 10 == 5) {
                     cout << format("batch_i:%1% iteration:%2%") % batch_i % iteration << endl;
@@ -913,7 +911,6 @@ int main(int argc, const char *argv[]) {
                 int batch_size = batch_i == batch_count ?
                     train_conversation_pairs.size() % hyper_params.batch_size :
                     hyper_params.batch_size;
-                profiler.BeginEvent("build graph");
                 Graph graph(false);
                 vector<shared_ptr<GraphBuilder>> graph_builders;
                 vector<DecoderComponents> decoder_components_vector;
@@ -940,7 +937,6 @@ int main(int argc, const char *argv[]) {
                             response_sentences.at(response_id), hyper_params, model_params, true);
                     decoder_components_vector.push_back(decoder_components);
                 }
-                profiler.EndCudaEvent();
 
                 graph.forward();
 
@@ -966,8 +962,8 @@ int main(int argc, const char *argv[]) {
                     total_result_nodes.push_back(result_node);
                 }
 
-                float loss = crossEntropyLoss(total_result_nodes, model_params.lookup_table.nVSize,
-                        total_word_ids, 1.0 / word_sum);
+                float loss = n3ldg_plus::likelihoodLoss(total_result_nodes,
+                        model_params.lookup_table.nVSize, total_word_ids, 1.0 / word_sum);
                 loss_sum += loss * word_sum;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
@@ -1035,16 +1031,7 @@ int main(int argc, const char *argv[]) {
                 }
 #endif
 
-                if (hyper_params.optimizer == Optimizer::ADAM) {
-                    model_update.updateAdam(10.0f);
-                } else if (hyper_params.optimizer == Optimizer::ADAGRAD) {
-                    model_update.update(10.0f);
-                } else if (hyper_params.optimizer == Optimizer::ADAMW) {
-                    model_update.updateAdamW(10.0f);
-                } else {
-                    cerr << "no optimzer set" << endl;
-                    abort();
-                }
+                 optimizer->step();
 
                 if (batch_i > 10) {
                     auto duration = duration_cast<milliseconds>(time_record - last_time_record);
@@ -1073,9 +1060,6 @@ int main(int argc, const char *argv[]) {
 
             last_loss_sum = loss_sum;
             loss_sum = 0;
-            profiler.EndCudaEvent();
-            profiler.Print();
-            profiler.SetEnabled(false);
         }
     } else {
         abort();

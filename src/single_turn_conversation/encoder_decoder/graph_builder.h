@@ -201,7 +201,7 @@ vector<BeamSearchResult> mostProbableResults(
                     continue;
                 }
             }
-            if (j == model_params.lookup_table.getElemId(::unknownkey)) {
+            if (j == model_params.lookup_table.getElemId(n3ldg_plus::UNKNOWN_WORD)) {
                 continue;
             }
             dtype word_probability = node.getVal().v[j];
@@ -315,7 +315,7 @@ struct GraphBuilder {
             ModelParams &model_params) {
         using namespace n3ldg_plus;
         Node *emb = embedding(graph, model_params.lookup_table, answer);
-        decoder_components.decoder.connect(*emb);
+        decoder_components.decoder.step(*emb);
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
                 model_params);
         Node *onehot = linear(graph, *decoder_to_wordvector, model_params.lookup_table.E);

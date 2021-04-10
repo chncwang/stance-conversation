@@ -8,9 +8,9 @@
 
 using namespace ::n3ldg_plus;
 
-struct ModelParams : public Serializable, public TunableCombination<BaseParam>
+struct ModelParams : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
     LookupTable<Param> lookup_table;
@@ -25,25 +25,6 @@ struct ModelParams : public Serializable, public TunableCombination<BaseParam>
     transformer_encoder_params("encoder"), enc_norm("enc_norm"), dec_norm("dec_norm"),
     decoder_params("decoder_params") {}
 
-    Json::Value toJson() const override {
-        Json::Value json;
-        json["lookup_table"] = lookup_table.toJson();
-        json["hidden_to_wordvector_params"] = hidden_to_wordvector_params.toJson();
-        json["transformer_encoder_params"] = transformer_encoder_params.toJson();
-        json["enc_norm"] = enc_norm.toJson();
-        json["dec_norm"] = dec_norm.toJson();
-        json["decoder_params"] = decoder_params.toJson();
-        return json;
-    }
-
-    void fromJson(const Json::Value &json) override {
-        lookup_table.fromJson(json["lookup_table"]);
-        hidden_to_wordvector_params.fromJson(json["hidden_to_wordvector_params"]);
-        transformer_encoder_params.fromJson(json["transformer_encoder_params"]);
-        enc_norm.fromJson(json["enc_norm"]);
-        dec_norm.fromJson(json["dec_norm"]);
-        decoder_params.fromJson(json["decoder_params"]);
-    }
 
     template<typename Archive>
     void serialize(Archive &ar) {
@@ -52,7 +33,7 @@ struct ModelParams : public Serializable, public TunableCombination<BaseParam>
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+    std::vector<cuda::Transferable *> transferablePtrs() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
             &enc_norm, &dec_norm, &decoder_params};
     }

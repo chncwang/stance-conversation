@@ -321,9 +321,9 @@ float greedyMatching(const vector<string> &a, const vector<string> &b,
         float max_cos = -2;
         for (const auto &ref_word : b) {
             int candidate_id = embedding_table.elems.from_string(candidate_word);
-            dtype *candidate_vector = embedding_table.E.val[candidate_id];
+            dtype *candidate_vector = embedding_table.E.val()[candidate_id];
             int ref_id = embedding_table.elems.from_string(ref_word);
-            dtype *ref_vector = embedding_table.E.val[ref_id];
+            dtype *ref_vector = embedding_table.E.val()[ref_id];
             float cos = vectorCos(candidate_vector, ref_vector, embedding_table.E.outDim());
             if (cos > max_cos) {
                 max_cos = cos;
@@ -342,7 +342,7 @@ float computeGreedyMatching(const CandidateAndReferences &candidate_and_refs,
         auto known_ref = ref;
         for (auto &w : known_ref) {
             if (!embedding_table.findElemId(w)) {
-                w = unknownkey;
+                w = n3ldg_plus::UNKNOWN_WORD;
             }
         }
         float g = 0.5 * (greedyMatching(known_ref, candidate_and_refs.candidate, embedding_table) +
@@ -364,7 +364,7 @@ vector<dtype> sentenceAvgEmbedding(const vector<string> &s, LookupTable<Param>& 
 
     for (const string &w : s) {
         int word_id = embedding_table.elems.from_string(w);
-        dtype *emb_vector = embedding_table.E.val[word_id];
+        dtype *emb_vector = embedding_table.E.val()[word_id];
         for (int i = 0; i < dim; ++i) {
             result.at(i) += emb_vector[i];
         }
@@ -396,7 +396,7 @@ float computeEmbeddingAvg(const CandidateAndReferences &candidate_and_refs,
         auto known_ref = ref;
         for (auto &w : known_ref) {
             if (!embedding_table.findElemId(w)) {
-                w = unknownkey;
+                w = n3ldg_plus::UNKNOWN_WORD;
             }
         }
         float avg = embeddingAvg(known_ref, candidate_and_refs.candidate, embedding_table);
@@ -417,7 +417,7 @@ vector<dtype> sentenceExtrema(const vector<string> &s, LookupTable<Param>& embed
 
     for (const string &w : s) {
         int word_id = embedding_table.elems.from_string(w);
-        dtype *emb_vector = embedding_table.E.val[word_id];
+        dtype *emb_vector = embedding_table.E.val()[word_id];
         for (int i = 0; i < dim; ++i) {
             result.at(i) += emb_vector[i];
             if (abs(emb_vector[i]) > abs(result.at(i))) {
@@ -448,7 +448,7 @@ float computeExtrema(const CandidateAndReferences &candidate_and_refs,
         auto known_ref = ref;
         for (auto &w : known_ref) {
             if (!embedding_table.findElemId(w)) {
-                w = unknownkey;
+                w = n3ldg_plus::UNKNOWN_WORD;
             }
         }
         float avg = extrema(known_ref, candidate_and_refs.candidate, embedding_table);
