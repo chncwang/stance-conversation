@@ -8,20 +8,19 @@
 
 using namespace ::n3ldg_plus;
 
-struct ModelParams : public TunableCombination<BaseParam>
+struct ModelParams : public TunableParamCollection
 #if USE_GPU
 , public cuda::TransferableComponents
 #endif
 {
-    LookupTable<Param> lookup_table;
+    Embedding<Param> lookup_table;
     LinearParam hidden_to_wordvector_params;
     TransformerEncoderParams transformer_encoder_params;
     LayerNormalizationParams enc_norm;
     LayerNormalizationParams dec_norm;
     TransformerDecoderParams decoder_params;
 
-    ModelParams() : lookup_table("lookup_table"),
-    hidden_to_wordvector_params("hidden_to_wordvector_params"),
+    ModelParams() : hidden_to_wordvector_params("hidden_to_wordvector_params"),
     transformer_encoder_params("encoder"), enc_norm("enc_norm"), dec_norm("dec_norm"),
     decoder_params("decoder_params") {}
 
@@ -40,7 +39,7 @@ struct ModelParams : public TunableCombination<BaseParam>
 #endif
 
 protected:
-    virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
+    virtual std::vector<TunableParam *> tunableComponents() override {
         return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
             &enc_norm, &dec_norm, &decoder_params};
     }

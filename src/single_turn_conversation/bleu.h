@@ -315,7 +315,7 @@ dtype vectorCos(const dtype *a, const dtype *b, int len) {
 }
 
 float greedyMatching(const vector<string> &a, const vector<string> &b,
-        LookupTable<Param>& embedding_table) {
+        Embedding<Param>& embedding_table) {
     float max_cos_sum = 0;
     for (const auto &candidate_word : a) {
         float max_cos = -2;
@@ -335,7 +335,7 @@ float greedyMatching(const vector<string> &a, const vector<string> &b,
 }
 
 float computeGreedyMatching(const CandidateAndReferences &candidate_and_refs,
-        LookupTable<Param>& embedding_table) {
+        Embedding<Param>& embedding_table) {
     const auto &refs = candidate_and_refs.references;
     float max_g = -2;
     for (const auto &ref : refs) {
@@ -354,7 +354,7 @@ float computeGreedyMatching(const CandidateAndReferences &candidate_and_refs,
     return max_g;
 }
 
-vector<dtype> sentenceAvgEmbedding(const vector<string> &s, LookupTable<Param>& embedding_table) {
+vector<dtype> sentenceAvgEmbedding(const vector<string> &s, Embedding<Param>& embedding_table) {
     vector<dtype> result;
     int dim = embedding_table.E.outDim();
     result.resize(dim);
@@ -378,7 +378,7 @@ vector<dtype> sentenceAvgEmbedding(const vector<string> &s, LookupTable<Param>& 
 }
 
 float embeddingAvg(const vector<string> &a, const vector<string> &b,
-        LookupTable<Param>& embedding_table) {
+        Embedding<Param>& embedding_table) {
     auto av = sentenceAvgEmbedding(a, embedding_table);
     auto bv = sentenceAvgEmbedding(b, embedding_table);
     if (av.size() != bv.size()) {
@@ -389,7 +389,7 @@ float embeddingAvg(const vector<string> &a, const vector<string> &b,
 }
 
 float computeEmbeddingAvg(const CandidateAndReferences &candidate_and_refs,
-        LookupTable<Param>& embedding_table) {
+        Embedding<Param>& embedding_table) {
     const auto &refs = candidate_and_refs.references;
     float max_avg = -1e10;
     for (const auto &ref : refs) {
@@ -407,7 +407,7 @@ float computeEmbeddingAvg(const CandidateAndReferences &candidate_and_refs,
     return max_avg;
 }
 
-vector<dtype> sentenceExtrema(const vector<string> &s, LookupTable<Param>& embedding_table) {
+vector<dtype> sentenceExtrema(const vector<string> &s, Embedding<Param>& embedding_table) {
     vector<dtype> result;
     int dim = embedding_table.E.outDim();
     result.resize(dim);
@@ -430,7 +430,7 @@ vector<dtype> sentenceExtrema(const vector<string> &s, LookupTable<Param>& embed
 }
 
 dtype extrema(const vector<string> &a, const vector<string> &b,
-        LookupTable<Param>& embedding_table) {
+        Embedding<Param>& embedding_table) {
     auto av = sentenceExtrema(a, embedding_table);
     auto bv = sentenceExtrema(b, embedding_table);
     if (av.size() != bv.size()) {
@@ -441,7 +441,7 @@ dtype extrema(const vector<string> &a, const vector<string> &b,
 }
 
 float computeExtrema(const CandidateAndReferences &candidate_and_refs,
-        LookupTable<Param>& embedding_table) {
+        Embedding<Param>& embedding_table) {
     const auto &refs = candidate_and_refs.references;
     float max_avg = -1e10;
     for (const auto &ref : refs) {

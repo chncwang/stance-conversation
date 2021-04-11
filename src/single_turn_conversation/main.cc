@@ -236,7 +236,7 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     return hyper_params;
 }
 
-vector<int> toIds(const vector<string> &sentence, LookupTable<Param> &lookup_table) {
+vector<int> toIds(const vector<string> &sentence, Embedding<Param> &lookup_table) {
     vector<int> ids;
     for (const string &word : sentence) {
 	int xid = lookup_table.getElemId(word);
@@ -287,7 +287,7 @@ void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
         int &epoch,
         const string &filename,
         const function<void(const DefaultConfig &default_config, const HyperParams &hyper_params,
-            ModelParams &model_params, const Alphabet*)> &allocate_model_params) {
+            ModelParams &model_params, const Vocab*)> &allocate_model_params) {
     ifstream is(filename.c_str());
     if (is) {
         cout << "loading model..." << endl;
@@ -423,7 +423,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         const vector<vector<string>> &response_sentences,
         const unordered_map<string, float> &all_idf,
         const vector<string> &black_list) {
-    LookupTable<Param> original_embeddings;
+    Embedding<Param> original_embeddings;
     original_embeddings.init(model_params.lookup_table.elems, hyper_params.word_file);
 
     vector<vector<vector<string>>> ref_sentences;
@@ -725,7 +725,7 @@ int main(int argc, const char *argv[]) {
 
     auto all_idf = calculateIdf(all_sentences);
 
-    Alphabet alphabet;
+    Vocab alphabet;
     unordered_map<string, int> word_counts;
     if (default_config.program_mode == ProgramMode::TRAINING) {
         auto wordStat = [&]() {
@@ -751,7 +751,7 @@ int main(int argc, const char *argv[]) {
     auto allocate_model_params = [](const DefaultConfig &default_config,
             const HyperParams &hyper_params,
             ModelParams &model_params,
-            const Alphabet *alphabet) {
+            const Vocab *alphabet) {
         if (alphabet != nullptr) {
             model_params.lookup_table.init(*alphabet, hyper_params.hidden_dim, true);
         }

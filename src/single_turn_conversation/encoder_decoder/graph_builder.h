@@ -102,7 +102,7 @@ private:
 };
 
 void printWordIds(const vector<int> &word_ids_with_probability_vector,
-        const LookupTable<Param> &lookup_table,
+        const Embedding<Param> &lookup_table,
         bool print_space = false) {
     for (const int &id : word_ids_with_probability_vector) {
         cout << lookup_table.elems.from_id(id);
