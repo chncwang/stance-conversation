@@ -13,16 +13,16 @@ struct DecoderComponents {
     TransformerDecoderBuilder decoder;
 
     DecoderComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,
-            int src_sentence_len, dtype dropout, bool is_training) : decoder(graph, params,
-                encoder_hiddens, src_sentence_len, dropout, is_training) {}
+            int src_sentence_len, dtype dropout) : decoder(params,
+                encoder_hiddens, src_sentence_len, dropout) {}
 
     Node* decoderToWordVectors(Graph &graph, int dec_sentence_len,
             const HyperParams &hyper_params,
             ModelParams &model_params) {
         using namespace n3ldg_plus;
-        Node *normed = layerNormalization(graph, model_params.dec_norm,
-                *decoder.hiddenLayers().back(), dec_sentence_len);
-        Node *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
+        Node *normed = layerNormalization(model_params.dec_norm, *decoder.hiddenLayers().back(),
+                dec_sentence_len);
+        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
                 model_params.hidden_to_wordvector_params);
         return decoder_to_wordvector;
     }
@@ -33,15 +33,14 @@ struct DecoderCellComponents {
     n3ldg_plus::TransformerDecoderCellBuilder decoder;
 
     DecoderCellComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,
-            int src_sentence_len, dtype dropout, bool is_training) : decoder(graph, params,
-                encoder_hiddens, src_sentence_len, dropout, is_training) {}
+            int src_sentence_len, dtype dropout) : decoder(params,
+                encoder_hiddens, src_sentence_len, dropout) {}
 
-    Node* decoderToWordVectors(Graph &graph, const HyperParams &hyper_params,
-            ModelParams &model_params) {
+    Node* decoderToWordVectors(const HyperParams &hyper_params, ModelParams &model_params) {
         using namespace n3ldg_plus;
-        Node *normed = layerNormalization(graph, model_params.dec_norm,
+        Node *normed = layerNormalization(model_params.dec_norm,
                 *decoder.hiddenLayers().back().back());
-        Node *decoder_to_wordvector = n3ldg_plus::linear(graph, *normed,
+        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
                 model_params.hidden_to_wordvector_params);
         return decoder_to_wordvector;
     }

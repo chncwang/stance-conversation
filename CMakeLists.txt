@@ -72,7 +72,7 @@ INCLUDE_DIRECTORIES(3rd/inih)
 INCLUDE_DIRECTORIES(3rd/tinyutf8)
 
 if(USE_CUDA)
-    add_definitions(-DUSE_GPU) #comments
+    add_definitions(-DUSE_GPU)
 endif()
 
 

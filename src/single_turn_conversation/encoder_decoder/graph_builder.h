@@ -69,9 +69,9 @@ string getSentence(const vector<int> &word_ids_vector, const ModelParams &model_
 class BeamSearchResult {
 public:
     BeamSearchResult(Graph &graph, TransformerDecoderParams &params,
-            Node &encoder_hidden, int encoder_sentence_len, dtype dropout,
-            bool is_training) : decoder_components_(graph, params, encoder_hidden,
-                encoder_sentence_len, dropout, is_training) {
+            Node &encoder_hidden, int encoder_sentence_len, dtype dropout) :
+        decoder_components_(graph, params, encoder_hidden,
+                encoder_sentence_len, dropout) {
     }
 
     BeamSearchResult(const BeamSearchResult &beam_search_result) = default;
@@ -267,7 +267,7 @@ vector<BeamSearchResult> mostProbableResults(
 }
 
 Node *embedding(Graph &graph, ModelParams &model_params, const vector<string> &words) {
-    return n3ldg_plus::embedding(graph, model_params.lookup_table, words);
+    return n3ldg_plus::embedding(graph, words, model_params.lookup_table);
 }
 
 struct GraphBuilder {
@@ -275,38 +275,37 @@ struct GraphBuilder {
 
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
-            ModelParams &model_params,
-            bool is_training) {
+            ModelParams &model_params) {
         using namespace n3ldg_plus;
         Node *emb = embedding(graph, model_params, sentence);
-        encoder_hiddens = transformerEncoder(graph, model_params.transformer_encoder_params,
-                *emb, sentence.size(), hyper_params.dropout, is_training);
-        encoder_hiddens = layerNormalization(graph, model_params.enc_norm, *encoder_hiddens,
+        encoder_hiddens = transformerEncoder(*emb, sentence.size(),
+                model_params.transformer_encoder_params,
+                hyper_params.dropout).back();
+        encoder_hiddens = layerNormalization(model_params.enc_norm, *encoder_hiddens,
                 sentence.size());
     }
 
-    void forwardDecoder(Graph &graph, DecoderComponents &decoder_components,
-            const vector<string> &answer,
-            const HyperParams &hyper_params,
-            ModelParams &model_params,
-            bool is_training) {
+    Node *forwardDecoder(Node &enc, const vector<string> &answer, const HyperParams &hyper_params,
+            ModelParams &model_params) {
         using namespace n3ldg_plus;
-        decoder_components.decoder.prepare();
 
         vector<string> words;
         words.push_back(BEGIN_SYMBOL);
         for (int i = 1; i < answer.size(); ++i) {
             words.push_back(answer.at(i - 1));
         }
+        Graph &graph = dynamic_cast<Graph &>(enc.getNodeContainer());
         Node *emb = embedding(graph, model_params, words);
 
-        decoder_components.decoder.connect(*emb, answer.size());
-
-        Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph,
-                answer.size(), hyper_params, model_params);
-        Node *onehot = linear(graph, *decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(graph, *onehot, words.size());
-        decoder_components.wordvector_to_onehots = softmax;
+        int src_sentence_len = enc.getDim() / hyper_params.hidden_dim;
+        Node *dec = transformerDecoder(enc, src_sentence_len, *emb, words.size(),
+                model_params.decoder_params, hyper_params.dropout).back();
+        Node *normed = layerNormalization(model_params.dec_norm, *dec, words.size());
+        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
+                model_params.hidden_to_wordvector_params);
+        Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
+        Node *softmax = n3ldg_plus::softmax(*onehot, words.size());
+        return softmax;
     }
 
     void forwardDecoderByOneStep(Graph &graph, DecoderCellComponents &decoder_components,
@@ -314,12 +313,12 @@ struct GraphBuilder {
             const HyperParams &hyper_params,
             ModelParams &model_params) {
         using namespace n3ldg_plus;
-        Node *emb = embedding(graph, model_params.lookup_table, answer);
+        Node *emb = embedding(graph, answer, model_params.lookup_table);
         decoder_components.decoder.step(*emb);
-        Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(graph, hyper_params,
+        Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(hyper_params,
                 model_params);
-        Node *onehot = linear(graph, *decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(graph, *onehot, 1);
+        Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
+        Node *softmax = n3ldg_plus::softmax(*onehot, 1);
         decoder_components.wordvector_to_onehot = softmax;
     }
 

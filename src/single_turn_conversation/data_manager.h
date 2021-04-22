@@ -191,7 +191,7 @@ std::vector<std::vector<std::string>> readSentences(const std::string &filename)
 
         characters.push_back(STOP_SYMBOL);
         results.push_back(characters);
-        if (i % 10000 == 0) {
+        if (i % 1000000 == 0) {
             cout << boost::format("i:%1%\n") % i;
             for (const string &c : characters) {
                 cout << c << " ";

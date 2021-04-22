@@ -328,17 +328,16 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
         vector<int> post_hit_counts, post_pos_amounts;
         cout << "response size:" << response_ids.size() << endl;
         for (int response_id : response_ids) {
-            Graph graph;
+            Graph graph(ModelStage::INFERENCE);
             GraphBuilder graph_builder;
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
-                    hyper_params, model_params, false);
+                    hyper_params, model_params);
             int src_sentence_len = post_sentences.at(post_and_responses.post_id).size();
             DecoderComponents decoder_components(graph, model_params.decoder_params,
-                    *graph_builder.encoder_hiddens, src_sentence_len, hyper_params.dropout, false);
-            graph_builder.forwardDecoder(graph, decoder_components,
-                    response_sentences.at(response_id), hyper_params, model_params, false);
+                    *graph_builder.encoder_hiddens, src_sentence_len, hyper_params.dropout);
+            Node *node = graph_builder.forwardDecoder(*graph_builder.encoder_hiddens,
+                    response_sentences.at(response_id), hyper_params, model_params);
             graph.forward();
-            Node *node = decoder_components.wordvector_to_onehots;
             vector<int> word_ids = transferVector<int, string>(
                     response_sentences.at(response_id), [&](const string &w) -> int {
                     return model_params.lookup_table.getElemId(w);
@@ -456,15 +455,15 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         ++loop_i;
         cout << "post:" << endl;
         print(post_sentences.at(post_and_responses.post_id));
-        Graph graph;
+        Graph graph(ModelStage::INFERENCE);
         GraphBuilder graph_builder;
         const auto &post_sentence = post_sentences.at(post_and_responses.post_id);
-        graph_builder.forward(graph, post_sentence, hyper_params, model_params, false);
+        graph_builder.forward(graph, post_sentence, hyper_params, model_params);
         vector<shared_ptr<DecoderCellComponents>> decoder_components_vector;
         for (int i = 0; i < hyper_params.beam_size; ++i) {
             shared_ptr<DecoderCellComponents> ptr(new DecoderCellComponents(graph,
                         model_params.decoder_params, *graph_builder.encoder_hiddens,
-                        post_sentence.size(), hyper_params.dropout, false));
+                        post_sentence.size(), hyper_params.dropout));
             ptr->decoder.prepare();
             decoder_components_vector.push_back(ptr);
         }
@@ -612,11 +611,7 @@ void preserveVector(vector<T> &vec, int count, int seed) {
 unordered_map<string, float> calculateIdf(const vector<vector<string>> &sentences) {
     cout << "sentences size:" << sentences.size() << endl;
     unordered_map<string, int> doc_counts;
-    int i = 0;
     for (const vector<string> &sentence : sentences) {
-        if (i++ % 10000 == 0) {
-            cout << i << " ";
-        }
         set<string> words;
         for (const string &word : sentence) {
             words.insert(word);
@@ -631,7 +626,6 @@ unordered_map<string, float> calculateIdf(const vector<vector<string>> &sentence
             }
         }
     }
-    cout << endl;
 
     unordered_map<string, float> result;
     for (const auto &it : doc_counts) {
@@ -678,7 +672,7 @@ int main(int argc, const char *argv[]) {
 #endif
 
 #if USE_GPU
-    cuda::InitCuda(default_config.device_id, default_config.memory_in_gb);
+    cuda::initCuda(default_config.device_id, default_config.memory_in_gb);
 #endif
 
     HyperParams hyper_params = parseHyperParams(ini_reader);
@@ -911,9 +905,9 @@ int main(int argc, const char *argv[]) {
                 int batch_size = batch_i == batch_count ?
                     train_conversation_pairs.size() % hyper_params.batch_size :
                     hyper_params.batch_size;
-                Graph graph(false);
+                Graph graph;
                 vector<shared_ptr<GraphBuilder>> graph_builders;
-                vector<DecoderComponents> decoder_components_vector;
+                vector<Node *> decoder_outputs;
                 vector<ConversationPair> conversation_pair_in_batch;
                 auto getSentenceIndex = [batch_i, batch_count](int i) {
                     return i * batch_count + batch_i;
@@ -926,16 +920,11 @@ int main(int argc, const char *argv[]) {
                     conversation_pair_in_batch.push_back(train_conversation_pairs.at(
                                 instance_index));
                     graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
-                            model_params, true);
+                            model_params);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
-                    int src_sentence_len = post_sentences.at(post_id).size();
-                    DecoderComponents decoder_components(graph, model_params.decoder_params,
-                            *graph_builder->encoder_hiddens, src_sentence_len,
-                            hyper_params.dropout, true);
-
-                    graph_builder->forwardDecoder(graph, decoder_components,
-                            response_sentences.at(response_id), hyper_params, model_params, true);
-                    decoder_components_vector.push_back(decoder_components);
+                    Node *node = graph_builder->forwardDecoder(*graph_builder->encoder_hiddens,
+                            response_sentences.at(response_id), hyper_params, model_params);
+                    decoder_outputs.push_back(node);
                 }
 
                 graph.forward();
@@ -958,12 +947,12 @@ int main(int argc, const char *argv[]) {
                     vector<int> word_ids = toIds(response_sentences.at(response_id),
                             model_params.lookup_table);
                     total_word_ids.push_back(move(word_ids));
-                    Node *result_node = decoder_components_vector.at(i).wordvector_to_onehots;
+                    Node *result_node = decoder_outputs.at(i);
                     total_result_nodes.push_back(result_node);
                 }
 
-                float loss = n3ldg_plus::likelihoodLoss(total_result_nodes,
-                        model_params.lookup_table.nVSize, total_word_ids, 1.0 / word_sum);
+                float loss = n3ldg_plus::NLLoss(total_result_nodes,
+                        model_params.lookup_table.size(), total_word_ids, 1.0 / word_sum);
                 loss_sum += loss * word_sum;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
