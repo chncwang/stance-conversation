@@ -332,11 +332,8 @@ float metricTestPosts(const HyperParams &hyper_params, ModelParams &model_params
             GraphBuilder graph_builder;
             graph_builder.forward(graph, post_sentences.at(post_and_responses.post_id),
                     hyper_params, model_params);
-            int src_sentence_len = post_sentences.at(post_and_responses.post_id).size();
-            DecoderComponents decoder_components(graph, model_params.decoder_params,
-                    *graph_builder.encoder_hiddens, src_sentence_len, hyper_params.dropout);
-            Node *node = graph_builder.forwardDecoder(*graph_builder.encoder_hiddens,
-                    response_sentences.at(response_id), hyper_params, model_params);
+            Node *node = graph_builder.forwardDecoder(response_sentences.at(response_id),
+                    hyper_params, model_params);
             graph.forward();
             vector<int> word_ids = transferVector<int, string>(
                     response_sentences.at(response_id), [&](const string &w) -> int {
@@ -461,10 +458,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         graph_builder.forward(graph, post_sentence, hyper_params, model_params);
         vector<shared_ptr<DecoderCellComponents>> decoder_components_vector;
         for (int i = 0; i < hyper_params.beam_size; ++i) {
-            shared_ptr<DecoderCellComponents> ptr(new DecoderCellComponents(graph,
-                        model_params.decoder_params, *graph_builder.encoder_hiddens,
-                        post_sentence.size(), hyper_params.dropout));
-            ptr->decoder.prepare();
+            shared_ptr<DecoderCellComponents> ptr(new DecoderCellComponents);
             decoder_components_vector.push_back(ptr);
         }
         auto pair = graph_builder.forwardDecoderUsingBeamSearch(graph, decoder_components_vector,
@@ -749,16 +743,12 @@ int main(int argc, const char *argv[]) {
         if (alphabet != nullptr) {
             model_params.lookup_table.init(*alphabet, hyper_params.hidden_dim, true);
         }
-        model_params.transformer_encoder_params.init(hyper_params.hidden_layer,
-                hyper_params.hidden_dim, hyper_params.head_count, 512);
-        model_params.decoder_params.init(hyper_params.hidden_layer, hyper_params.hidden_dim,
-                hyper_params.head_count, 512);
-        model_params.hidden_to_wordvector_params.init(
-                hyper_params.hidden_dim,
-                hyper_params.hidden_dim,
-                false);
-        model_params.enc_norm.init(hyper_params.hidden_dim);
-        model_params.dec_norm.init(hyper_params.hidden_dim);
+        model_params.l2r_encoder_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
+        model_params.r2l_encoder_params.init(hyper_params.hidden_dim, hyper_params.hidden_dim);
+        model_params.attention_params.init(2 * hyper_params.hidden_dim, hyper_params.hidden_dim);
+        model_params.decoder_params.init(hyper_params.hidden_dim, 3 * hyper_params.hidden_dim);
+        model_params.hidden_to_wordvector_params.init(hyper_params.hidden_dim,
+                hyper_params.hidden_dim, false);
     };
 
     int saved_epoch = -1;
@@ -922,8 +912,8 @@ int main(int argc, const char *argv[]) {
                     graph_builder->forward(graph, post_sentences.at(post_id), hyper_params,
                             model_params);
                     int response_id = train_conversation_pairs.at(instance_index).response_id;
-                    Node *node = graph_builder->forwardDecoder(*graph_builder->encoder_hiddens,
-                            response_sentences.at(response_id), hyper_params, model_params);
+                    Node *node = graph_builder->forwardDecoder(response_sentences.at(response_id),
+                            hyper_params, model_params);
                     decoder_outputs.push_back(node);
                 }
 
@@ -952,7 +942,7 @@ int main(int argc, const char *argv[]) {
                 }
 
                 float loss = n3ldg_plus::NLLoss(total_result_nodes,
-                        model_params.lookup_table.size(), total_word_ids, 1.0 / word_sum);
+                        model_params.lookup_table.size(), total_word_ids, 1.0);
                 loss_sum += loss * word_sum;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
@@ -991,27 +981,21 @@ int main(int argc, const char *argv[]) {
                  {
                     auto loss_function = [&](const ConversationPair &conversation_pair) -> dtype {
                         GraphBuilder graph_builder;
-                        Graph graph(false);
+                        Graph graph;
 
                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
-                                hyper_params, model_params, true);
-                        int src_len = post_sentences.at(conversation_pair.post_id).size();
-
-                        DecoderComponents decoder_components(graph, model_params.decoder_params,
-                                *graph_builder.encoder_hiddens, src_len, hyper_params.dropout,
-                                true);
-                        graph_builder.forwardDecoder(graph, decoder_components,
+                                hyper_params, model_params);
+                        Node *node = graph_builder.forwardDecoder(
                                 response_sentences.at(conversation_pair.response_id),
-                                hyper_params, model_params, true);
+                                hyper_params, model_params);
 
-                        graph.compute();
+                        graph.forward();
 
                         vector<int> word_ids = toIds(response_sentences.at(
                                     conversation_pair.response_id), model_params.lookup_table);
-                        Node* result_node = decoder_components.wordvector_to_onehots;
-                        vector<Node *> nodes = {result_node};
-                        return crossEntropyLoss(nodes, model_params.lookup_table.nVSize,
-                                {word_ids}, 1.0 / word_sum);
+                        vector<Node *> nodes = {node};
+                        return n3ldg_plus::NLLoss(nodes, model_params.lookup_table.nVSize,
+                                {word_ids}, 1.0);
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;

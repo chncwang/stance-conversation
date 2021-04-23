@@ -8,39 +8,25 @@
 
 using namespace n3ldg_plus;
 
-struct DecoderComponents {
-    Node *wordvector_to_onehots;
-    TransformerDecoderBuilder decoder;
-
-    DecoderComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,
-            int src_sentence_len, dtype dropout) : decoder(params,
-                encoder_hiddens, src_sentence_len, dropout) {}
-
-    Node* decoderToWordVectors(Graph &graph, int dec_sentence_len,
-            const HyperParams &hyper_params,
-            ModelParams &model_params) {
-        using namespace n3ldg_plus;
-        Node *normed = layerNormalization(model_params.dec_norm, *decoder.hiddenLayers().back(),
-                dec_sentence_len);
-        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
-                model_params.hidden_to_wordvector_params);
-        return decoder_to_wordvector;
-    }
-};
+Node* decoderToWordVectors(const std::vector<Node *> &hiddens, int dec_sentence_len,
+        const HyperParams &hyper_params,
+        ModelParams &model_params) {
+    using namespace n3ldg_plus;
+    Node *hidden = concatToMatrix(hiddens);
+    Node *decoder_to_wordvector = n3ldg_plus::linear(*hidden,
+            model_params.hidden_to_wordvector_params);
+    return decoder_to_wordvector;
+}
 
 struct DecoderCellComponents {
     Node *wordvector_to_onehot;
-    n3ldg_plus::TransformerDecoderCellBuilder decoder;
+    LSTMState state;
 
-    DecoderCellComponents(Graph &graph, TransformerDecoderParams &params, Node &encoder_hiddens,
-            int src_sentence_len, dtype dropout) : decoder(params,
-                encoder_hiddens, src_sentence_len, dropout) {}
+    DecoderCellComponents() = default;
 
     Node* decoderToWordVectors(const HyperParams &hyper_params, ModelParams &model_params) {
         using namespace n3ldg_plus;
-        Node *normed = layerNormalization(model_params.dec_norm,
-                *decoder.hiddenLayers().back().back());
-        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
+        Node *decoder_to_wordvector = n3ldg_plus::linear(*state.hidden,
                 model_params.hidden_to_wordvector_params);
         return decoder_to_wordvector;
     }
