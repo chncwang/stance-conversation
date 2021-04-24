@@ -943,11 +943,11 @@ int main(int argc, const char *argv[]) {
 
                 float loss = n3ldg_plus::NLLoss(total_result_nodes,
                         model_params.lookup_table.size(), total_word_ids, 1.0);
-                loss_sum += loss * word_sum;
+                loss_sum += loss;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
                     float p = max(1.0 / n, 0.0001);
-                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * loss;
+                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * loss / word_sum;
                 } else {
                     smooth_log_ppl = loss;
                 }
@@ -967,6 +967,7 @@ int main(int argc, const char *argv[]) {
                     vector<int> word_ids = toIds(response_sentences.at(response_id),
                             model_params.lookup_table);
                     printWordIds(word_ids, model_params.lookup_table);
+                    cout << fmt::format("loss:{}\n", loss);
                     cout << "output:" << endl;
                     printWordIds(predicted_ids.at(0), model_params.lookup_table);
                 }

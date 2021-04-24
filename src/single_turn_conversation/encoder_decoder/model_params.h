@@ -33,8 +33,8 @@ struct ModelParams : public TunableParamCollection
 
 #if USE_GPU
     std::vector<cuda::Transferable *> transferablePtrs() override {
-        return {&lookup_table, &hidden_to_wordvector_params, &transformer_encoder_params,
-            &enc_norm, &dec_norm, &decoder_params};
+        return {&lookup_table, &hidden_to_wordvector_params, &l2r_encoder_params,
+            &r2l_encoder_params, &decoder_params, &attention_params};
     }
 #endif
 
