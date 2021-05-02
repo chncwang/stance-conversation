@@ -877,8 +877,10 @@ int main(int argc, const char *argv[]) {
 
             for (int batch_i = 0; batch_i < batch_count + (train_conversation_pairs.size() >
                         hyper_params.batch_size * batch_count); ++batch_i) {
-                last_time_record = move(time_record);
-                time_record = high_resolution_clock::now();
+                if (batch_i % 10 == 0) {
+                    last_time_record = move(time_record);
+                    time_record = high_resolution_clock::now();
+                }
                 if (iteration < hyper_params.warm_up_iterations) {
                     optimizer->setLearningRate(hyper_params.learning_rate);
                 } else {
@@ -943,6 +945,7 @@ int main(int argc, const char *argv[]) {
 
                 float loss = n3ldg_plus::NLLoss(total_result_nodes,
                         model_params.lookup_table.size(), total_word_ids, 1.0);
+//                float loss = 0;
                 loss_sum += loss;
                 if (smooth_log_ppl > 0) {
                     int n = batch_i + 1;
@@ -979,24 +982,24 @@ int main(int argc, const char *argv[]) {
                 graph.backward();
 
 #if USE_DOUBLE
-                 {
-                    auto loss_function = [&](const ConversationPair &conversation_pair) -> dtype {
-                        GraphBuilder graph_builder;
-                        Graph graph;
+                {
+                     auto loss_function = [&](const ConversationPair &conversation_pair) -> dtype {
+                         GraphBuilder graph_builder;
+                         Graph graph;
 
-                        graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
-                                hyper_params, model_params);
-                        Node *node = graph_builder.forwardDecoder(
-                                response_sentences.at(conversation_pair.response_id),
-                                hyper_params, model_params);
+                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
+                                 hyper_params, model_params);
+                         Node *node = graph_builder.forwardDecoder(
+                                 response_sentences.at(conversation_pair.response_id),
+                                 hyper_params, model_params);
 
-                        graph.forward();
+                         graph.forward();
 
-                        vector<int> word_ids = toIds(response_sentences.at(
-                                    conversation_pair.response_id), model_params.lookup_table);
-                        vector<Node *> nodes = {node};
-                        return n3ldg_plus::NLLoss(nodes, model_params.lookup_table.nVSize,
-                                {word_ids}, 1.0);
+                         vector<int> word_ids = toIds(response_sentences.at(
+                                     conversation_pair.response_id), model_params.lookup_table);
+                         vector<Node *> nodes = {node};
+                         return n3ldg_plus::NLLoss(nodes, model_params.lookup_table.nVSize,
+                                 {word_ids}, 1.0);
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
                         conversation_pair_in_batch.size() << endl;
@@ -1005,7 +1008,7 @@ int main(int argc, const char *argv[]) {
                 }
 #endif
 
-                 optimizer->step();
+                optimizer->step();
 
                 if (batch_i > 10) {
                     auto duration = duration_cast<milliseconds>(time_record - last_time_record);
