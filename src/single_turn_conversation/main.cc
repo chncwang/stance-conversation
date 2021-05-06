@@ -218,6 +218,8 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     }
     hyper_params.l2_reg = l2_reg;
 
+    hyper_params.clip_grad = ini_reader.GetReal("hyper", "clip_grad", 0.0f);
+
     string word_file = ini_reader.Get("hyper", "word_file", "");
     hyper_params.word_file = word_file;
 
@@ -1008,7 +1010,7 @@ int main(int argc, const char *argv[]) {
                 }
 #endif
 
-                optimizer->step();
+                optimizer->step(hyper_params.clip_grad);
 
                 if (batch_i > 10) {
                     auto duration = duration_cast<milliseconds>(time_record - last_time_record);

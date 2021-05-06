@@ -31,11 +31,12 @@ struct HyperParams {
     float l2_reg;
     ::Optimizer optimizer;
     string word_file;
+    float clip_grad;
 
     template<typename Archive>
     void serialize(Archive &ar) {
         ar(hidden_dim, hidden_layer, head_count, dropout, batch_size, beam_size, learning_rate,
-                lr_decay, warm_up_iterations, word_cutoff, l2_reg, optimizer);
+                lr_decay, warm_up_iterations, word_cutoff, l2_reg, optimizer, clip_grad);
     }
 
     void print() const {
@@ -51,7 +52,8 @@ struct HyperParams {
 	    << "word_cutoff:" << word_cutoff << std::endl
     	    << "l2_reg:" << l2_reg << std::endl
     	    << "word_file:" << word_file << std::endl
-    	    << "optimizer:" << optimizer << std::endl; 
+    	    << "optimizer:" << optimizer << std::endl
+    	    << "clip_grad:" << clip_grad << std::endl;
     }
 };
 
