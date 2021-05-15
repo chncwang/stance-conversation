@@ -58,7 +58,7 @@ set<int> repeatedIds(const vector<int> &sentence) {
 string getSentence(const vector<int> &word_ids_vector, const ModelParams &model_params) {
     string words;
     for (const int &w : word_ids_vector) {
-        string str = model_params.lookup_table.elems.from_id(w);
+        string str = model_params.lookup_table.vocab.from_id(w);
         words += str;
     }
     return words;
@@ -105,7 +105,7 @@ void printWordIds(const vector<int> &word_ids_with_probability_vector,
         const Embedding<Param> &lookup_table,
         bool print_space = false) {
     for (const int &id : word_ids_with_probability_vector) {
-        cout << lookup_table.elems.from_id(id);
+        cout << lookup_table.vocab.from_id(id);
         if (print_space && &id != &word_ids_with_probability_vector.back()) {
             cout << " ";
         }
@@ -197,7 +197,7 @@ vector<BeamSearchResult> mostProbableResults(
             if (is_first) {
                 if (searched_word_ids.find(j) != searched_word_ids.end()) {
                     cout << boost::format("word id searched:%1% word:%2%\n") % j %
-                        model_params.lookup_table.elems.from_id(j);
+                        model_params.lookup_table.vocab.from_id(j);
                     continue;
                 }
             }
@@ -368,7 +368,7 @@ struct GraphBuilder {
                         const vector<int> &word_ids = beam_search_result.getPath();
 
                         int last_word_id = word_ids.at(word_ids.size() - 1);
-                        const string &word = model_params.lookup_table.elems.from_id(last_word_id);
+                        const string &word = model_params.lookup_table.vocab.from_id(last_word_id);
                         if (word == STOP_SYMBOL) {
                             word_ids_result.push_back(make_pair(word_ids,
                                         beam_search_result.finalScore()));
