@@ -264,6 +264,7 @@ void analyze(const vector<int> &results, const vector<int> &answers, Metric &met
 
 string saveModel(const HyperParams &hyper_params, ModelParams &model_params,
         const string &filename_prefix, int epoch) {
+    return "";
     cout << "saving model file..." << endl;
     auto t = time(nullptr);
     auto tm = *localtime(&t);
@@ -1022,22 +1023,23 @@ int main(int argc, const char *argv[]) {
 
                  optimizer->step();
 
-                if (batch_i > 10) {
-                    auto duration = duration_cast<milliseconds>(time_record - last_time_record);
-                    duration_count = (duration_count * (batch_i - 10) +  duration.count()) /
-                        (batch_i - 9);
-                    if (batch_i % 10 == 5) {
-                        cout << "duration:" << duration_count << endl;
-                    }
-                }
+                 if (batch_i > 10) {
+                     auto duration = duration_cast<milliseconds>(time_record - last_time_record);
+                     duration_count = (duration_count * (batch_i - 10) +  duration.count()) /
+                         (batch_i - 9);
+                     if (batch_i % 10 == 5) {
+                         cout << "duration:" << duration_count << endl;
+                     }
+                 }
 
-                if (default_config.save_model_per_batch) {
-                    saveModel(hyper_params, model_params, default_config.output_model_file_prefix,
-                            epoch);
-                }
+                 if (default_config.save_model_per_batch) {
+                     saveModel(hyper_params, model_params, default_config.output_model_file_prefix,
+                             epoch);
+                 }
 
-                ++iteration;
+                 ++iteration;
             }
+            exit(0);
 
             float perplex = metricTestPosts(hyper_params, model_params,
                     dev_post_and_responses, post_sentences, response_sentences);
