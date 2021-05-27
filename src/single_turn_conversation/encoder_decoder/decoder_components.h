@@ -12,7 +12,7 @@ Node* decoderToWordVectors(const std::vector<Node *> &hiddens, int dec_sentence_
         const HyperParams &hyper_params,
         ModelParams &model_params) {
     using namespace n3ldg_plus;
-    Node *hidden = concatToMatrix(hiddens);
+    Node *hidden = cat(hiddens);
     Node *decoder_to_wordvector = n3ldg_plus::linear(*hidden,
             model_params.hidden_to_wordvector_params);
     return decoder_to_wordvector;

@@ -11,30 +11,31 @@
 
 #include "n3ldg-plus/n3ldg-plus.h"
 
-float computePerplex(const Node &node, int row, const std::vector<int> &answers, int &hit_count,
-        vector<int> &hit_flags,
+float computePerplex(const n3ldg_plus::Node &node, int row, const std::vector<int> &answers,
+        int &hit_count,
+        std::vector<int> &hit_flags,
         int hit_beam) {
     if (hit_beam < 1) {
-        cerr << "hit beam is less than 0" << hit_beam << endl;
+        std::cerr << "hit beam is less than 0" << hit_beam << std::endl;
         abort();
     }
     float log_sum = 0.0f;
     float count_sum = 0;
     hit_flags.clear();
 
-    int col = node.getDim() / row;
-    if (col * row != node.getDim()) {
-        cerr << boost::format("computePerplex col:%1% node dim:%2%\n") % col % node.getDim()
-            << endl;
+    int col = node.size() / row;
+    if (col * row != node.size()) {
+        std::cerr << boost::format("computePerplex col:%1% node dim:%2%\n") % col % node.size()
+            << std::endl;
     }
     for (int i = 0; i < col; ++i) {
         int answer = answers.at(i);
-        if (answer < 0 || answer >= node.getDim()) {
-            cerr << boost::format("answer:%1% dim:%2%") << answer << node.getDim() << endl;
+        if (answer < 0 || answer >= node.size()) {
+            std::cerr << boost::format("answer:%1% dim:%2%") << answer << node.size() << std::endl;
             abort();
         }
 #if USE_GPU
-        const_cast<Node &>(node).val().copyFromDeviceToHost();
+        const_cast<n3ldg_plus::Node &>(node).val().copyFromDeviceToHost();
 #endif
         float reciprocal_answer_prob = 1 / node.getVal()[row * i + answer];
         log_sum += log(reciprocal_answer_prob);

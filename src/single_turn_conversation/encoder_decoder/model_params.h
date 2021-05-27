@@ -14,7 +14,7 @@ struct ModelParams : public TunableParamCollection
 #endif
 {
     Embedding<Param> lookup_table;
-    LinearParam hidden_to_wordvector_params;
+    LinearParams hidden_to_wordvector_params;
     LSTMParams l2r_encoder_params;
     LSTMParams r2l_encoder_params;
     LSTMParams decoder_params;

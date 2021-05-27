@@ -422,7 +422,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
         const unordered_map<string, float> &all_idf,
         const vector<string> &black_list) {
     Embedding<Param> original_embeddings;
-    original_embeddings.init(model_params.lookup_table.elems, hyper_params.word_file);
+    original_embeddings.init(model_params.lookup_table.vocab, hyper_params.word_file);
 
     vector<vector<vector<string>>> ref_sentences;
     for (const PostAndResponses &post_and_responses : post_and_responses_vector) {
@@ -505,7 +505,7 @@ void decodeTestPosts(const HyperParams &hyper_params, ModelParams &model_params,
 
         vector<string> decoded_word_ids;
         auto to_str = [&](int in) ->string {
-            return model_params.lookup_table.elems.from_id(in);
+            return model_params.lookup_table.vocab.from_id(in);
         };
         transform(word_ids_and_probability.begin(), word_ids_and_probability.end(),
                 back_inserter(decoded_word_ids), to_str);

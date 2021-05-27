@@ -58,7 +58,7 @@ set<int> repeatedIds(const vector<int> &sentence) {
 string getSentence(const vector<int> &word_ids_vector, const ModelParams &model_params) {
     string words;
     for (const int &w : word_ids_vector) {
-        string str = model_params.lookup_table.elems.from_id(w);
+        string str = model_params.lookup_table.vocab.from_id(w);
         words += str;
     }
     return words;
@@ -102,7 +102,7 @@ void printWordIds(const vector<int> &word_ids_with_probability_vector,
         const Embedding<Param> &lookup_table,
         bool print_space = false) {
     for (const int &id : word_ids_with_probability_vector) {
-        cout << lookup_table.elems.from_id(id);
+        cout << lookup_table.vocab.from_id(id);
         if (print_space && &id != &word_ids_with_probability_vector.back()) {
             cout << " ";
         }
@@ -176,7 +176,7 @@ vector<BeamSearchResult> mostProbableResults(
     for (int i = 0; i < (is_first ? 1 : nodes.size()); ++i) {
         Node &node = *nodes.at(i);
 #if USE_GPU
-        node.val().initOnMemory(node.getDim());
+        node.val().initOnMemory(node.size());
         node.val().copyFromDeviceToHost();
 #endif
         set<int> repeated_ids;
@@ -187,14 +187,14 @@ vector<BeamSearchResult> mostProbableResults(
             }
             repeated_ids = repeatedIds(word_ids);
         }
-        for (int j = 0; j < nodes.at(i)->getDim(); ++j) {
+        for (int j = 0; j < nodes.at(i)->size(); ++j) {
             if (repeated_ids.find(j) != repeated_ids.end()) {
                 continue;
             }
             if (is_first) {
                 if (searched_word_ids.find(j) != searched_word_ids.end()) {
                     cout << boost::format("word id searched:%1% word:%2%\n") % j %
-                        model_params.lookup_table.elems.from_id(j);
+                        model_params.lookup_table.vocab.from_id(j);
                     continue;
                 }
             }
@@ -277,7 +277,7 @@ struct GraphBuilder {
             emb = dropout(*emb, hyper_params.dropout);
             embs.push_back(emb);
         }
-        Node *h0 = bucket(graph, hyper_params.hidden_dim, 0.0f);
+        Node *h0 = tensor(graph, hyper_params.hidden_dim, 0.0f);
         LSTMState initial_state = {h0, h0};
         std::vector<Node *> l2r = lstm(initial_state, embs, model_params.l2r_encoder_params,
                 hyper_params.dropout);
@@ -286,9 +286,9 @@ struct GraphBuilder {
                 hyper_params.dropout);
         std::reverse(r2l.begin(), r2l.end());
 
-        Node *l2r_matrix = concatToMatrix(l2r);
-        Node *r2l_matrix = concatToMatrix(r2l);
-        encoder_hiddens = concat({l2r_matrix, r2l_matrix}, l2r.size());
+        Node *l2r_matrix = cat(l2r);
+        Node *r2l_matrix = cat(r2l);
+        encoder_hiddens = cat({l2r_matrix, r2l_matrix}, l2r.size());
         enc_len = l2r.size();
     }
 
@@ -302,7 +302,7 @@ struct GraphBuilder {
             words.push_back(answer.at(i - 1));
         }
         Graph &graph = dynamic_cast<Graph &>(encoder_hiddens->getNodeContainer());
-        Node *h0 = bucket(graph, hyper_params.hidden_dim, 0.0f);
+        Node *h0 = tensor(graph, hyper_params.hidden_dim, 0.0f);
         LSTMState last_state = {h0, h0};
         vector<Node *> decoder_hiddens;
         for (const string &w : words) {
@@ -310,12 +310,12 @@ struct GraphBuilder {
             emb = dropout(*emb, hyper_params.dropout);
             Node *context = additiveAttention(*last_state.hidden, *encoder_hiddens, enc_len,
                     model_params.attention_params).first;
-            Node *in = concat({emb, context});
+            Node *in = cat({emb, context});
             last_state = lstm(last_state, *in, model_params.decoder_params, hyper_params.dropout);
             decoder_hiddens.push_back(last_state.hidden);
         }
 
-        Node *hidden_matrix = concatToMatrix(decoder_hiddens);
+        Node *hidden_matrix = cat(decoder_hiddens);
         Node *decoder_to_wordvector = n3ldg_plus::linear(*hidden_matrix,
                 model_params.hidden_to_wordvector_params);
         Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
@@ -384,7 +384,7 @@ struct GraphBuilder {
                         const vector<int> &word_ids = beam_search_result.getPath();
 
                         int last_word_id = word_ids.at(word_ids.size() - 1);
-                        const string &word = model_params.lookup_table.elems.from_id(last_word_id);
+                        const string &word = model_params.lookup_table.vocab.from_id(last_word_id);
                         if (word == STOP_SYMBOL) {
                             word_ids_result.push_back(make_pair(word_ids,
                                         beam_search_result.finalScore()));

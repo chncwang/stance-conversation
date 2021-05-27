@@ -320,9 +320,9 @@ float greedyMatching(const vector<string> &a, const vector<string> &b,
     for (const auto &candidate_word : a) {
         float max_cos = -2;
         for (const auto &ref_word : b) {
-            int candidate_id = embedding_table.elems.from_string(candidate_word);
+            int candidate_id = embedding_table.vocab.from_string(candidate_word);
             dtype *candidate_vector = embedding_table.E.val()[candidate_id];
-            int ref_id = embedding_table.elems.from_string(ref_word);
+            int ref_id = embedding_table.vocab.from_string(ref_word);
             dtype *ref_vector = embedding_table.E.val()[ref_id];
             float cos = vectorCos(candidate_vector, ref_vector, embedding_table.E.outDim());
             if (cos > max_cos) {
@@ -363,7 +363,7 @@ vector<dtype> sentenceAvgEmbedding(const vector<string> &s, Embedding<Param>& em
     }
 
     for (const string &w : s) {
-        int word_id = embedding_table.elems.from_string(w);
+        int word_id = embedding_table.vocab.from_string(w);
         dtype *emb_vector = embedding_table.E.val()[word_id];
         for (int i = 0; i < dim; ++i) {
             result.at(i) += emb_vector[i];
@@ -416,7 +416,7 @@ vector<dtype> sentenceExtrema(const vector<string> &s, Embedding<Param>& embeddi
     }
 
     for (const string &w : s) {
-        int word_id = embedding_table.elems.from_string(w);
+        int word_id = embedding_table.vocab.from_string(w);
         dtype *emb_vector = embedding_table.E.val()[word_id];
         for (int i = 0; i < dim; ++i) {
             result.at(i) += emb_vector[i];
