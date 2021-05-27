@@ -99,7 +99,7 @@ int main() {
             Node *z;
             if (i > 0) {
                 z = n3ldg_plus::concat(*graph, {y, n3ldg_plus::bucket(*graph,
-                            i * dim - col_sum->getDim(), 0), col_sum});
+                            i * dim - col_sum->size(), 0), col_sum});
             } else {
                 z = y;
             }

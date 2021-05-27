@@ -14,10 +14,10 @@ struct ModelParams : public TunableParamCollection
 #endif
 {
     Embedding<Param> lookup_table;
-    LinearParam hidden_to_wordvector_params;
+    LinearParams hidden_to_wordvector_params;
     TransformerEncoderParams transformer_encoder_params;
-    LayerNormalizationParams enc_norm;
-    LayerNormalizationParams dec_norm;
+    LayerNormParams enc_norm;
+    LayerNormParams dec_norm;
     TransformerDecoderParams decoder_params;
 
     ModelParams() : hidden_to_wordvector_params("hidden_to_wordvector_params"),

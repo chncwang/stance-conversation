@@ -103,7 +103,7 @@ private:
 
 void printWordIds(const vector<int> &word_ids_with_probability_vector,
         const Embedding<Param> &lookup_table,
-        bool print_space = false) {
+        bool print_space = true) {
     for (const int &id : word_ids_with_probability_vector) {
         cout << lookup_table.vocab.from_id(id);
         if (print_space && &id != &word_ids_with_probability_vector.back()) {
@@ -179,7 +179,7 @@ vector<BeamSearchResult> mostProbableResults(
     for (int i = 0; i < (is_first ? 1 : nodes.size()); ++i) {
         Node &node = *nodes.at(i);
 #if USE_GPU
-        node.val().initOnMemory(node.getDim());
+        node.val().initOnMemory(node.size());
         node.val().copyFromDeviceToHost();
 #endif
         set<int> repeated_ids;
@@ -190,7 +190,7 @@ vector<BeamSearchResult> mostProbableResults(
             }
             repeated_ids = repeatedIds(word_ids);
         }
-        for (int j = 0; j < nodes.at(i)->getDim(); ++j) {
+        for (int j = 0; j < nodes.at(i)->size(); ++j) {
             if (repeated_ids.find(j) != repeated_ids.end()) {
                 continue;
             }
@@ -278,11 +278,9 @@ struct GraphBuilder {
             ModelParams &model_params) {
         using namespace n3ldg_plus;
         Node *emb = embedding(graph, model_params, sentence);
-        encoder_hiddens = transformerEncoder(*emb, sentence.size(),
-                model_params.transformer_encoder_params,
+        encoder_hiddens = transformerEncoder(*emb, model_params.transformer_encoder_params,
                 hyper_params.dropout).back();
-        encoder_hiddens = layerNormalization(model_params.enc_norm, *encoder_hiddens,
-                sentence.size());
+        encoder_hiddens = layerNorm(*encoder_hiddens, model_params.enc_norm);
     }
 
     Node *forwardDecoder(Node &enc, const vector<string> &answer, const HyperParams &hyper_params,
@@ -297,14 +295,13 @@ struct GraphBuilder {
         Graph &graph = dynamic_cast<Graph &>(enc.getNodeContainer());
         Node *emb = embedding(graph, model_params, words);
 
-        int src_sentence_len = enc.getDim() / hyper_params.hidden_dim;
-        Node *dec = transformerDecoder(enc, src_sentence_len, *emb, words.size(),
-                model_params.decoder_params, hyper_params.dropout).back();
-        Node *normed = layerNormalization(model_params.dec_norm, *dec, words.size());
+        Node *dec = transformerDecoder(enc, *emb, model_params.decoder_params,
+                hyper_params.dropout).back();
+        Node *normed = layerNorm(*dec, model_params.dec_norm);
         Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
                 model_params.hidden_to_wordvector_params);
         Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(*onehot, words.size());
+        Node *softmax = n3ldg_plus::softmax(*onehot, model_params.lookup_table.size());
         return softmax;
     }
 
@@ -318,7 +315,7 @@ struct GraphBuilder {
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(hyper_params,
                 model_params);
         Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(*onehot, 1);
+        Node *softmax = n3ldg_plus::softmax(*onehot, onehot->size());
         decoder_components.wordvector_to_onehot = softmax;
     }
 

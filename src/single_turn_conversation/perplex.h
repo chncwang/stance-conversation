@@ -22,15 +22,15 @@ float computePerplex(const Node &node, int row, const std::vector<int> &answers,
     float count_sum = 0;
     hit_flags.clear();
 
-    int col = node.getDim() / row;
-    if (col * row != node.getDim()) {
-        cerr << boost::format("computePerplex col:%1% node dim:%2%\n") % col % node.getDim()
+    int col = node.size() / row;
+    if (col * row != node.size()) {
+        cerr << boost::format("computePerplex col:%1% node dim:%2%\n") % col % node.size()
             << endl;
     }
     for (int i = 0; i < col; ++i) {
         int answer = answers.at(i);
-        if (answer < 0 || answer >= node.getDim()) {
-            cerr << boost::format("answer:%1% dim:%2%") << answer << node.getDim() << endl;
+        if (answer < 0 || answer >= node.size()) {
+            cerr << boost::format("answer:%1% dim:%2%") << answer << node.size() << endl;
             abort();
         }
 #if USE_GPU

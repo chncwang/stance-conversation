@@ -1039,7 +1039,6 @@ int main(int argc, const char *argv[]) {
 
                  ++iteration;
             }
-            exit(0);
 
             float perplex = metricTestPosts(hyper_params, model_params,
                     dev_post_and_responses, post_sentences, response_sentences);
