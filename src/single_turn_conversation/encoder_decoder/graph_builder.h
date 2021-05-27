@@ -319,7 +319,7 @@ struct GraphBuilder {
         Node *decoder_to_wordvector = n3ldg_plus::linear(*hidden_matrix,
                 model_params.hidden_to_wordvector_params);
         Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(*onehot, words.size());
+        Node *softmax = n3ldg_plus::softmax(*onehot, model_params.lookup_table.size());
         return softmax;
     }
 
@@ -334,7 +334,7 @@ struct GraphBuilder {
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(hyper_params,
                 model_params);
         Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(*onehot, 1);
+        Node *softmax = n3ldg_plus::softmax(*onehot, onehot->size());
         decoder_components.wordvector_to_onehot = softmax;
     }
 
