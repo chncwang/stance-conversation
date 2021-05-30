@@ -992,26 +992,22 @@ int main(int argc, const char *argv[]) {
                  {
                     auto loss_function = [&](const ConversationPair &conversation_pair) -> dtype {
                         GraphBuilder graph_builder;
-                        Graph graph(false);
+                        Graph graph;
 
                         graph_builder.forward(graph, post_sentences.at(conversation_pair.post_id),
-                                hyper_params, model_params, true);
+                                hyper_params, model_params);
                         int src_len = post_sentences.at(conversation_pair.post_id).size();
 
-                        DecoderComponents decoder_components(graph, model_params.decoder_params,
-                                *graph_builder.encoder_hiddens, src_len, hyper_params.dropout,
-                                true);
-                        graph_builder.forwardDecoder(graph, decoder_components,
+                        Node *result_node = graph_builder.forwardDecoder(*graph_builder.encoder_hiddens,
                                 response_sentences.at(conversation_pair.response_id),
-                                hyper_params, model_params, true);
+                                hyper_params, model_params);
 
-                        graph.compute();
+                        graph.forward();
 
                         vector<int> word_ids = toIds(response_sentences.at(
                                     conversation_pair.response_id), model_params.lookup_table);
-                        Node* result_node = decoder_components.wordvector_to_onehots;
                         vector<Node *> nodes = {result_node};
-                        return crossEntropyLoss(nodes, model_params.lookup_table.nVSize,
+                        return NLLoss(nodes, model_params.lookup_table.nVSize,
                                 {word_ids}, 1.0 / word_sum);
                     };
                     cout << format("checking grad - conversation_pair size:%1%") %
