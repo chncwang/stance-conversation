@@ -264,7 +264,6 @@ void analyze(const vector<int> &results, const vector<int> &answers, Metric &met
 
 string saveModel(const HyperParams &hyper_params, ModelParams &model_params,
         const string &filename_prefix, int epoch) {
-    return "";
     cout << "saving model file..." << endl;
     auto t = time(nullptr);
     auto tm = *localtime(&t);
