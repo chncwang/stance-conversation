@@ -880,8 +880,6 @@ int main(int argc, const char *argv[]) {
             int corpus_word_sum = 0;
             cout << "calculated warmup:" << hyper_params.warm_up_iterations << endl;
 
-            float smooth_log_ppl = -1;
-
             std::chrono::time_point<std::chrono::high_resolution_clock> last_time_record;
             std::chrono::time_point<std::chrono::high_resolution_clock> time_record;
 
@@ -954,13 +952,6 @@ int main(int argc, const char *argv[]) {
                 float loss = n3ldg_plus::NLLoss(total_result_nodes,
                         model_params.lookup_table.size(), total_word_ids, 1.0 / word_sum);
                 loss_sum += loss * word_sum;
-                if (smooth_log_ppl > 0) {
-                    int n = batch_i + 1;
-                    float p = max(1.0 / n, 0.0001);
-                    smooth_log_ppl = (1 - p) * smooth_log_ppl + p * loss;
-                } else {
-                    smooth_log_ppl = loss;
-                }
 
                 auto predicted_ids = predict(total_result_nodes, model_params.lookup_table.nVSize);
                 for (int i = 0; i < predicted_ids.size(); ++i) {
@@ -981,7 +972,7 @@ int main(int argc, const char *argv[]) {
                     printWordIds(predicted_ids.at(0), model_params.lookup_table);
                 }
                 if (batch_i % 10 == 5) {
-                    cout << "ppl:" << exp(smooth_log_ppl) << std::endl;
+                    cout << "ppl:" << exp(loss_sum / corpus_word_sum) << std::endl;
                     metric->print();
                 }
 
