@@ -954,8 +954,10 @@ int main(int argc, const char *argv[]) {
                     total_result_nodes.push_back(result_node);
                 }
 
+                dtype loss_factor = 1.0 / hyper_params.batch_size / 11.2;
+
                 float loss = n3ldg_plus::NLLoss(total_result_nodes,
-                        model_params.lookup_table.size(), total_word_ids, 1.0 / word_sum);
+                        model_params.lookup_table.size(), total_word_ids, loss_factor);
                 loss_sum += loss * word_sum;
 
                 auto predicted_ids = predict(total_result_nodes, model_params.lookup_table.nVSize);
