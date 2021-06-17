@@ -30,6 +30,7 @@ struct DefaultConfig {
     bool one_response;
     bool learn_test;
     bool save_model_per_batch;
+    bool save_model;
     bool split_unknown_words;
     int train_sample_count;
     int dev_sample_count;
@@ -65,6 +66,7 @@ struct DefaultConfig {
             << "one_response:" << one_response << std::endl
             << "learn_test:" << learn_test << std::endl
             << "save_model_per_batch:" << save_model_per_batch << std::endl
+            << "save_model:" << save_model << std::endl
             << "split_unknown_words:" << split_unknown_words << std::endl
             << "train_sample_count:" << train_sample_count << std::endl
             << "dev_sample_count:" << dev_sample_count << std::endl

@@ -115,6 +115,7 @@ DefaultConfig parseDefaultConfig(INIReader &ini_reader) {
     default_config.learn_test = ini_reader.GetBoolean(SECTION, "learn_test", false);
     default_config.save_model_per_batch = ini_reader.GetBoolean(SECTION, "save_model_per_batch",
             false);
+    default_config.save_model = ini_reader.GetBoolean(SECTION, "save_model", true);
     default_config.split_unknown_words = ini_reader.GetBoolean(SECTION, "split_unknown_words",
             true);
 
@@ -205,9 +206,10 @@ HyperParams parseHyperParams(INIReader &ini_reader) {
     }
     hyper_params.warm_up_iterations = warm_up_iterations;
 
-    int word_cutoff = ini_reader.GetReal("hyper", "word_cutoff", -1);
+    int word_cutoff = ini_reader.GetReal("hyper", "word_cutoff", 0);
     if(word_cutoff == -1){
    	cerr << "word_cutoff read error" << endl;
+        abort();
     }
     hyper_params.word_cutoff = word_cutoff;
 
@@ -263,7 +265,10 @@ void analyze(const vector<int> &results, const vector<int> &answers, Metric &met
 }
 
 string saveModel(const HyperParams &hyper_params, ModelParams &model_params,
-        const string &filename_prefix, int epoch) {
+        const string &filename_prefix, int epoch, bool save = true) {
+    if (!save) {
+        return "";
+    }
     cout << "saving model file..." << endl;
     auto t = time(nullptr);
     auto tm = *localtime(&t);
@@ -1032,7 +1037,7 @@ int main(int argc, const char *argv[]) {
 
             cout << "loss_sum:" << loss_sum << " last_loss_sum:" << endl;
             last_saved_model = saveModel(hyper_params, model_params,
-                    default_config.output_model_file_prefix, epoch);
+                    default_config.output_model_file_prefix, epoch, default_config.save_model);
 
             last_loss_sum = loss_sum;
             loss_sum = 0;
