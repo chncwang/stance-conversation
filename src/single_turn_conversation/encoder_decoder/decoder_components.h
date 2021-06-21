@@ -19,11 +19,7 @@ struct DecoderComponents {
     Node* decoderToWordVectors(Graph &graph, int dec_sentence_len,
             const HyperParams &hyper_params,
             ModelParams &model_params) {
-        using namespace n3ldg_plus;
-        Node *normed = layerNorm(*decoder.hiddenLayers().back(), model_params.dec_norm);
-        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
-                model_params.hidden_to_wordvector_params);
-        return decoder_to_wordvector;
+        return decoder.hiddenLayers().back();
     }
 };
 
@@ -36,11 +32,7 @@ struct DecoderCellComponents {
                 encoder_hiddens, dropout) {}
 
     Node* decoderToWordVectors(const HyperParams &hyper_params, ModelParams &model_params) {
-        using namespace n3ldg_plus;
-        Node *normed = layerNorm(*decoder.hiddenLayers().back().back(), model_params.dec_norm);
-        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
-                model_params.hidden_to_wordvector_params);
-        return decoder_to_wordvector;
+        return decoder.hiddenLayers().back().back();
     }
 };
 #endif

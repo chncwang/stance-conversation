@@ -246,7 +246,7 @@ vector<BeamSearchResult> mostProbableResults(
         const auto &ids = result.getPath();
         string sentence = ::getSentence(ids, model_params);
         bool contain_black = false;
-        for (const string str : black_list) {
+        for (const string &str : black_list) {
             utf8_string utf8_str(str), utf8_sentece(sentence);
             if (utf8_sentece.find(utf8_str) != string::npos) {
                 contain_black = true;
@@ -297,11 +297,8 @@ struct GraphBuilder {
 
         Node *dec = transformerDecoder(enc, *emb, model_params.decoder_params,
                 hyper_params.dropout).back();
-        Node *normed = layerNorm(*dec, model_params.dec_norm);
-        Node *decoder_to_wordvector = n3ldg_plus::linear(*normed,
-                model_params.hidden_to_wordvector_params);
-        Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(*onehot, model_params.lookup_table.size());
+        dec = linear(*dec, model_params.lookup_table.E);
+        Node *softmax = n3ldg_plus::softmax(*dec, model_params.lookup_table.size());
         return softmax;
     }
 
