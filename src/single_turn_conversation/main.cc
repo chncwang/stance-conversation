@@ -758,7 +758,6 @@ int main(int argc, const char *argv[]) {
                 hyper_params.hidden_dim, hyper_params.head_count, 512);
         model_params.decoder_params.init(hyper_params.hidden_layer, hyper_params.hidden_dim,
                 hyper_params.head_count, 512);
-        model_params.enc_norm.init(hyper_params.hidden_dim);
     };
 
     int saved_epoch = -1;

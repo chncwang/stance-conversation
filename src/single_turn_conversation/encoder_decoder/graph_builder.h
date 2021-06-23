@@ -280,7 +280,6 @@ struct GraphBuilder {
         Node *emb = embedding(graph, model_params, sentence);
         encoder_hiddens = transformerEncoder(*emb, model_params.transformer_encoder_params,
                 hyper_params.dropout).back();
-        encoder_hiddens = layerNorm(*encoder_hiddens, model_params.enc_norm);
     }
 
     Node *forwardDecoder(Node &enc, const vector<string> &answer, const HyperParams &hyper_params,

@@ -15,28 +15,25 @@ struct ModelParams : public TunableParamCollection
 {
     Embedding<Param> lookup_table;
     TransformerEncoderParams transformer_encoder_params;
-    LayerNormParams enc_norm;
     TransformerDecoderParams decoder_params;
 
-    ModelParams() :
-    transformer_encoder_params("encoder"), enc_norm("enc_norm"), 
-    decoder_params("decoder_params") {}
+    ModelParams() : transformer_encoder_params("encoder"), decoder_params("decoder_params") {}
 
 
     template<typename Archive>
     void serialize(Archive &ar) {
-        ar(lookup_table, transformer_encoder_params, enc_norm, decoder_params);
+        ar(lookup_table, transformer_encoder_params, decoder_params);
     }
 
 #if USE_GPU
     std::vector<cuda::Transferable *> transferablePtrs() override {
-        return {&lookup_table, &transformer_encoder_params, &enc_norm, &decoder_params};
+        return {&lookup_table, &transformer_encoder_params, &decoder_params};
     }
 #endif
 
 protected:
     virtual std::vector<TunableParam *> tunableComponents() override {
-        return {&lookup_table, &transformer_encoder_params, &enc_norm, &decoder_params};
+        return {&lookup_table, &transformer_encoder_params, &decoder_params};
     }
 };
 
