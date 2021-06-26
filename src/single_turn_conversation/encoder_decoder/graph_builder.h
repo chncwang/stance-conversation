@@ -297,6 +297,7 @@ struct GraphBuilder {
         Node *dec = transformerDecoder(enc, *emb, model_params.decoder_params,
                 hyper_params.dropout).back();
         dec = linear(*dec, model_params.lookup_table.E);
+        dec = mul(*dec, sqrt(1.0 / model_params.lookup_table.size()));
         Node *softmax = n3ldg_plus::softmax(*dec, model_params.lookup_table.size());
         return softmax;
     }
