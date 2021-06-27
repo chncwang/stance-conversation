@@ -22,7 +22,7 @@
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/range/iterator_range.hpp>
-#include "n3ldg-plus/n3ldg-plus.h"
+#include "insnet/insnet.h"
 #include "single_turn_conversation/data_manager.h"
 #include "single_turn_conversation/def.h"
 #include "single_turn_conversation/bleu.h"
@@ -740,7 +740,7 @@ int main(int argc, const char *argv[]) {
             }
         };
         wordStat();
-        word_counts[n3ldg_plus::UNKNOWN_WORD] = 1000000000;
+        word_counts[insnet::UNKNOWN_WORD] = 1000000000;
         word_counts[BEGIN_SYMBOL] = 1000000000;
         alphabet.init(word_counts, hyper_params.word_cutoff);
         cout << boost::format("post alphabet size:%1%") % alphabet.size() << endl;
@@ -827,12 +827,12 @@ int main(int argc, const char *argv[]) {
             }
         }
     } else if (default_config.program_mode == ProgramMode::TRAINING) {
-        n3ldg_plus::Optimizer *optimizer;
+        insnet::Optimizer *optimizer;
         if (hyper_params.optimizer == ::Optimizer::ADAM) {
-            optimizer = new n3ldg_plus::AdamOptimzer(model_params.tunableParams(),
+            optimizer = new insnet::AdamOptimzer(model_params.tunableParams(),
                     hyper_params.learning_rate, 0.9, 0.999, 1e-8, hyper_params.l2_reg);
         } else if (hyper_params.optimizer == ::Optimizer::ADAMW) {
-            optimizer = new n3ldg_plus::AdamWOptimzer(model_params.tunableParams(),
+            optimizer = new insnet::AdamWOptimzer(model_params.tunableParams(),
                     hyper_params.learning_rate, 0.9, 0.999, 1e-8, hyper_params.l2_reg);
         } else {
             cerr << "no optimzer set" << endl;
@@ -953,11 +953,12 @@ int main(int argc, const char *argv[]) {
                     total_result_nodes.push_back(result_node);
                 }
 
-                float loss = n3ldg_plus::NLLoss(total_result_nodes,
+                float loss = insnet::NLLLoss(total_result_nodes,
                         model_params.lookup_table.size(), total_word_ids, 1.0 / word_sum);
                 loss_sum += loss * word_sum;
 
-                auto predicted_ids = predict(total_result_nodes, model_params.lookup_table.nVSize);
+                auto predicted_ids = insnet::argmax(total_result_nodes,
+                        model_params.lookup_table.nVSize);
                 for (int i = 0; i < predicted_ids.size(); ++i) {
                     analyze(predicted_ids.at(i), total_word_ids.at(i), *metric);
                 }

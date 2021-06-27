@@ -11,7 +11,7 @@
 #include <queue>
 #include <algorithm>
 #include <boost/format.hpp>
-#include "n3ldg-plus/n3ldg-plus.h"
+#include "insnet/insnet.h"
 #include "tinyutf8.h"
 #include "model_params.h"
 #include "hyper_params.h"
@@ -201,7 +201,7 @@ vector<BeamSearchResult> mostProbableResults(
                     continue;
                 }
             }
-            if (j == model_params.lookup_table.getElemId(n3ldg_plus::UNKNOWN_WORD)) {
+            if (j == model_params.lookup_table.getElemId(insnet::UNKNOWN_WORD)) {
                 continue;
             }
             dtype word_probability = node.getVal().v[j];
@@ -267,7 +267,7 @@ vector<BeamSearchResult> mostProbableResults(
 }
 
 Node *embedding(Graph &graph, ModelParams &model_params, const vector<string> &words) {
-    return n3ldg_plus::embedding(graph, words, model_params.lookup_table);
+    return insnet::embedding(graph, words, model_params.lookup_table);
 }
 
 struct GraphBuilder {
@@ -276,7 +276,7 @@ struct GraphBuilder {
     void forward(Graph &graph, const vector<string> &sentence,
             const HyperParams &hyper_params,
             ModelParams &model_params) {
-        using namespace n3ldg_plus;
+        using namespace insnet;
         Node *emb = embedding(graph, model_params, sentence);
         encoder_hiddens = transformerEncoder(*emb, model_params.transformer_encoder_params,
                 hyper_params.dropout).back();
@@ -284,7 +284,7 @@ struct GraphBuilder {
 
     Node *forwardDecoder(Node &enc, const vector<string> &answer, const HyperParams &hyper_params,
             ModelParams &model_params) {
-        using namespace n3ldg_plus;
+        using namespace insnet;
 
         vector<string> words;
         words.push_back(BEGIN_SYMBOL);
@@ -299,7 +299,7 @@ struct GraphBuilder {
         dec = linear(*dec, model_params.lookup_table.E);
         dec = mul(*dec, sqrt(1.0 / model_params.lookup_table.size()));
         dec = bias(*dec, model_params.output_bias);
-        Node *softmax = n3ldg_plus::softmax(*dec, model_params.lookup_table.size());
+        Node *softmax = insnet::softmax(*dec, model_params.lookup_table.size());
         return softmax;
     }
 
@@ -307,13 +307,13 @@ struct GraphBuilder {
             const string &answer,
             const HyperParams &hyper_params,
             ModelParams &model_params) {
-        using namespace n3ldg_plus;
+        using namespace insnet;
         Node *emb = embedding(graph, answer, model_params.lookup_table);
         decoder_components.decoder.step(*emb);
         Node *decoder_to_wordvector = decoder_components.decoderToWordVectors(hyper_params,
                 model_params);
         Node *onehot = linear(*decoder_to_wordvector, model_params.lookup_table.E);
-        Node *softmax = n3ldg_plus::softmax(*onehot, onehot->size());
+        Node *softmax = insnet::softmax(*onehot, onehot->size());
         decoder_components.wordvector_to_onehot = softmax;
     }
 

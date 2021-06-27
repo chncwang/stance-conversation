@@ -4,9 +4,9 @@
 #include <fstream>
 #include <iostream>
 
-#include "n3ldg-plus/n3ldg-plus.h"
+#include "insnet/insnet.h"
 
-using namespace ::n3ldg_plus;
+using namespace insnet;
 
 struct ModelParams : public TunableParamCollection
 #if USE_GPU

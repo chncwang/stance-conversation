@@ -17,10 +17,10 @@
 #include "conversation_structure.h"
 #include "print.h"
 #include "tinyutf8.h"
-#include "n3ldg-plus/n3ldg-plus.h"
+#include "insnet/insnet.h"
 
 using namespace std;
-using namespace n3ldg_plus;
+using namespace insnet;
 
 struct CandidateAndReferences {
     vector<string> candidate;
@@ -342,7 +342,7 @@ float computeGreedyMatching(const CandidateAndReferences &candidate_and_refs,
         auto known_ref = ref;
         for (auto &w : known_ref) {
             if (!embedding_table.findElemId(w)) {
-                w = n3ldg_plus::UNKNOWN_WORD;
+                w = insnet::UNKNOWN_WORD;
             }
         }
         float g = 0.5 * (greedyMatching(known_ref, candidate_and_refs.candidate, embedding_table) +
@@ -396,7 +396,7 @@ float computeEmbeddingAvg(const CandidateAndReferences &candidate_and_refs,
         auto known_ref = ref;
         for (auto &w : known_ref) {
             if (!embedding_table.findElemId(w)) {
-                w = n3ldg_plus::UNKNOWN_WORD;
+                w = insnet::UNKNOWN_WORD;
             }
         }
         float avg = embeddingAvg(known_ref, candidate_and_refs.candidate, embedding_table);
@@ -448,7 +448,7 @@ float computeExtrema(const CandidateAndReferences &candidate_and_refs,
         auto known_ref = ref;
         for (auto &w : known_ref) {
             if (!embedding_table.findElemId(w)) {
-                w = n3ldg_plus::UNKNOWN_WORD;
+                w = insnet::UNKNOWN_WORD;
             }
         }
         float avg = extrema(known_ref, candidate_and_refs.candidate, embedding_table);

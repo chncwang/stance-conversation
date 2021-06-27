@@ -6,10 +6,10 @@
 #include <cmath>
 #include <boost/format.hpp>
 #include <string>
-#include "n3ldg-plus/n3ldg-plus.h"
+#include "insnet/insnet.h"
 
 using std::string;
-using namespace ::n3ldg_plus;
+using namespace insnet;
 
 enum Optimizer {
     ADAM = 0,

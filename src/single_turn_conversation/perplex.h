@@ -9,9 +9,9 @@
 #include <iostream>
 #include <boost/format.hpp>
 
-#include "n3ldg-plus/n3ldg-plus.h"
+#include "insnet/insnet.h"
 
-float computePerplex(const n3ldg_plus::Node &node, int row, const std::vector<int> &answers,
+float computePerplex(const insnet::Node &node, int row, const std::vector<int> &answers,
         int &hit_count,
         std::vector<int> &hit_flags,
         int hit_beam) {
@@ -35,7 +35,7 @@ float computePerplex(const n3ldg_plus::Node &node, int row, const std::vector<in
             abort();
         }
 #if USE_GPU
-        const_cast<n3ldg_plus::Node &>(node).val().copyFromDeviceToHost();
+        const_cast<insnet::Node &>(node).val().copyFromDeviceToHost();
 #endif
         float reciprocal_answer_prob = 1 / node.getVal()[row * i + answer];
         log_sum += log(reciprocal_answer_prob);
