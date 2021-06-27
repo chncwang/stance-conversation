@@ -4,9 +4,6 @@
 [submodule "3rd/inih"]
 	path = 3rd/inih
 	url = https://github.com/jtilly/inih
-[submodule "n3ldg-plus"]
-	path = n3ldg-plus
-	url = http://github.com/chncwang/n3ldg-plus
 [submodule "3rd/n3ldg-plus"]
 	path = 3rd/n3ldg-plus
-	url = http://github.com/chncwang/n3ldg-plus
+	url = http://github.com/chncwang/insnet

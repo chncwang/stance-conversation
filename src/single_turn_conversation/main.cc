@@ -281,7 +281,7 @@ string saveModel(const HyperParams &hyper_params, ModelParams &model_params,
 
     ofstream out(filename, ios::binary);
     cereal::BinaryOutputArchive output_ar(out);
-    output_ar(hyper_params, model_params, epoch);
+    output_ar(hyper_params, model_params.lookup_table.size(), model_params, epoch);
     out.close();
     cout << format("model file %1% saved") % filename << endl;
     return filename;
@@ -292,14 +292,16 @@ void loadModel(const DefaultConfig &default_config, HyperParams &hyper_params,
         int &epoch,
         const string &filename,
         const function<void(const DefaultConfig &default_config, const HyperParams &hyper_params,
-            ModelParams &model_params, const Vocab*)> &allocate_model_params) {
+            ModelParams &model_params, const Vocab*, int)> &allocate_model_params) {
     ifstream is(filename.c_str());
     if (is) {
         cout << "loading model..." << endl;
         cereal::BinaryInputArchive in_ar(is);
         in_ar(hyper_params);
         hyper_params.print();
-        allocate_model_params(default_config, hyper_params, model_params, nullptr);
+        int vocab_size;
+        in_ar(vocab_size);
+        allocate_model_params(default_config, hyper_params, model_params, nullptr, vocab_size);
         in_ar(model_params, epoch);
 #if USE_GPU
         model_params.copyFromHostToDevice();
@@ -750,7 +752,8 @@ int main(int argc, const char *argv[]) {
     auto allocate_model_params = [](const DefaultConfig &default_config,
             const HyperParams &hyper_params,
             ModelParams &model_params,
-            const Vocab *alphabet) {
+            const Vocab *alphabet,
+            int vocab_size) {
         if (alphabet != nullptr) {
             model_params.lookup_table.init(*alphabet, hyper_params.hidden_dim, true);
         }
@@ -758,12 +761,14 @@ int main(int argc, const char *argv[]) {
                 hyper_params.hidden_dim, hyper_params.head_count, 512);
         model_params.decoder_params.init(hyper_params.hidden_layer, hyper_params.hidden_dim,
                 hyper_params.head_count, 512);
+        model_params.output_bias.initAsBias(vocab_size);
     };
 
     int saved_epoch = -1;
     if (default_config.program_mode != ProgramMode::METRIC) {
         if (default_config.input_model_file == "") {
-            allocate_model_params(default_config, hyper_params, model_params, &alphabet);
+            allocate_model_params(default_config, hyper_params, model_params, &alphabet,
+                    alphabet.size());
         } else {
             loadModel(default_config, hyper_params, model_params, saved_epoch,
                     default_config.input_model_file, allocate_model_params);
